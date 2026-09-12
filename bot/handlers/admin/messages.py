@@ -5,12 +5,9 @@
 # Todas as mensagens que o bot envia vêm da tabela
 # message_templates e são editáveis por aqui.
 #
-# Todos os botões funcionam de verdade:
-#   - LISTAR por categoria
-#   - VER mensagem atual
-#   - EDITAR texto (com preview de variáveis)
-#   - RESTAURAR padrão
-#   - VISUALIZAR renderizada (com variáveis substituídas)
+# ✨ CORRIGIDO:
+#   - Bug de sintaxe na linha 449 (string mal fechada)
+#   - Parse mode "clean" agora usa string vazia
 # ============================================
 
 from aiogram import F, Router
@@ -446,7 +443,7 @@ async def cb_messages_mode(
             [InlineKeyboardButton(text="HTML (recomendado)", callback_data=f"adm_msg:set_mode:{key}:HTML")],
             [InlineKeyboardButton(text="Markdown", callback_data=f"adm_msg:set_mode:{key}:Markdown")],
             [InlineKeyboardButton(text="MarkdownV2", callback_data=f"adm_msg:set_mode:{key}:MarkdownV2")],
-            [InlineKeyboardButton(text="Sem formatação", callback_data=f"adm_msg:set_mode:{key}:"clean")],
+            [InlineKeyboardButton(text="Sem formatação", callback_data=f"adm_msg:set_mode:{key}:clean")],
             [InlineKeyboardButton(text="🔙 Voltar", callback_data=f"adm_msg:view:{key}:0")],
         ]
     )
@@ -471,6 +468,7 @@ async def cb_messages_set_mode(
     parts = callback.data.split(":", 3)
     key = parts[2]
     mode = parts[3]
+
     if mode == "clean":
         mode = ""
 
@@ -537,7 +535,6 @@ async def cb_messages_preview(
 
     key = callback.data.split(":")[2]
 
-    # Variáveis de exemplo
     example_vars = {
         "USER_ID": "6995978182",
         "USERNAME": "cliente_exemplo",

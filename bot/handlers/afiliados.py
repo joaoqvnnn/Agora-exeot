@@ -3,8 +3,16 @@
 # ============================================
 # Programa de afiliados + saques + cadastro de senha/banco/e-mail.
 # Mensagem única (edita, não acumula).
+#
+# ✨ ATUALIZADO:
+#   - Usa `email_verification` (persistente no banco)
+#   - Códigos sobrevivem a restart
+#   - Cooldown de 60s entre reenvios
+#   - Recuperação de senha completa (nova senha)
+#   - Auditoria de ações
 # ============================================
 
+import re
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 
@@ -38,12 +46,13 @@ from core.models import (
     AffiliateCommission,
     BankAccount,
     User,
+    VerificationCodeType,
     Withdrawal,
     WithdrawalMethod,
     WithdrawalStatus,
 )
 from core.services import config as config_service
-from core.services import email as email_service
+from core.services import email_verification
 from core.services import withdrawal as withdrawal_service
 
 
@@ -84,6 +93,19 @@ def _get_bot_username() -> str:
     return settings.telegram_bot_username or "meu_bot"
 
 
+def _mask_email(email: str) -> str:
+    """Mascara e-mail parcialmente."""
+    try:
+        local, domain = email.split("@", 1)
+        if len(local) <= 2:
+            local_m = local[0] + "*"
+        else:
+            local_m = local[0] + "*" * (len(local) - 2) + local[-1]
+        return f"{local_m}@{domain}"
+    except Exception:
+        return email
+
+
 # ============================================
 # 🏠 MENU PRINCIPAL DE AFILIADOS
 # ============================================
@@ -113,7 +135,9 @@ async def _show_affiliate_menu(
 ) -> None:
     # Configs
     commission = await config_service.get_str(session, "affiliate_commission", "20.0")
-    min_withdrawal = await config_service.get_str(session, "affiliate_min_withdrawal", "20.00")
+    min_withdrawal = await config_service.get_str(
+        session, "affiliate_min_withdrawal", "20.00"
+    )
 
     # Indicações
     referrals = await session.scalar(
@@ -155,6 +179,20 @@ async def _show_affiliate_menu(
     bot_username = _get_bot_username()
     referral_link = f"https://t.me/{bot_username}?start={user.telegram_id}"
 
+    # Status do e-mail
+    email_status = (
+        f"📧 {_mask_email(user.email)}"
+        if user.email and user.email_verified
+        else "📧 Não cadastrado"
+    )
+
+    # Status da senha
+    password_status = (
+        "🔐 Cadastrada"
+        if user.withdrawal_password_hash
+        else "🔓 Não cadastrada"
+    )
+
     text = (
         f"💰 <b>PROGRAMA DE AFILIADOS</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -167,6 +205,9 @@ async def _show_affiliate_menu(
         f"🔥 Saldo de comissões: <b>R$ {_format_brl(user.affiliate_balance)}</b>\n\n"
         f"🌱| Nível: <b>{level}</b>\n"
         f"🎯 Próxima meta: {next_goal}\n\n"
+        f"🔐 <b>Segurança:</b>\n"
+        f"├ {password_status}\n"
+        f"└ {email_status}\n\n"
         f"ℹ️ <b>INFO:</b> Seus indicados continuarão gerando comissão para sempre.\n"
         f"A comissão pode ser alterada a qualquer momento, fique atento aos avisos.\n"
         f"🔗 Seu link:\n<code>{referral_link}</code>"
@@ -372,7 +413,6 @@ async def msg_save_password(
     # Hasheia
     try:
         from passlib.hash import bcrypt
-
         hashed = bcrypt.hash(raw)
     except Exception as e:
         logger.exception(f"❌ Erro ao hashear senha: {e}")
@@ -397,7 +437,7 @@ async def msg_save_password(
 
 
 # ============================================
-# 📧 CADASTRAR E-MAIL
+# 📧 CADASTRAR E-MAIL (persistente)
 # ============================================
 @router.callback_query(F.data.in_(["aff:cadastrar_email", "aff:alterar_email"]))
 async def cb_register_email(
@@ -430,8 +470,6 @@ async def msg_save_recovery_email(
     user: User,
     session: AsyncSession,
 ) -> None:
-    import re
-
     raw = (message.text or "").strip().lower()
 
     if raw.startswith("/cancelar") or raw.startswith("/start"):
@@ -446,28 +484,40 @@ async def msg_save_recovery_email(
         )
         return
 
-    # Envia código
-    code = email_service.generate_verification_code()
-
-    await state.update_data(recovery_email=raw, recovery_code=code)
-
-    result = await email_service.send_verification_code(
-        to_email=raw,
-        code=code,
-        purpose="Cadastro de e-mail",
+    # Envia código (persistente no banco)
+    result = await email_verification.send_email_verification(
+        session=session,
+        user=user,
+        new_email=raw,
     )
 
     if not result.get("success"):
-        await message.answer(
-            f"❌ <b>Erro ao enviar e-mail.</b>\n\n"
-            f"<code>{result.get('error', 'Erro desconhecido')}</code>"
-        )
+        error = result.get("error", "Erro desconhecido")
+        cooldown = result.get("cooldown_seconds")
+
+        if cooldown:
+            await message.answer(
+                f"⏰ <b>Aguarde {cooldown}s</b> antes de solicitar outro código."
+            )
+        else:
+            await message.answer(
+                f"❌ <b>Erro ao enviar o e-mail.</b>\n\n"
+                f"<code>{error}</code>"
+            )
         return
 
+    # Salva no state
+    await state.update_data(recovery_email=raw)
+
+    expiration = result.get("expiration_minutes", 15)
+
     await message.answer(
-        f"📩 Enviamos um código para <b>{raw}</b>.\n\n"
-        f"Digite o código de 6 dígitos recebido:"
+        f"📩 <b>Enviamos um código para seu e-mail.</b>\n\n"
+        f"📧 E-mail: <b>{_mask_email(raw)}</b>\n\n"
+        f"Digite o <b>código de 6 dígitos</b> que você recebeu:\n\n"
+        f"<i>O código expira em {expiration} minutos.</i>"
     )
+
     await state.set_state(AffiliateStates.waiting_recovery_code)
 
 
@@ -485,28 +535,65 @@ async def msg_verify_recovery_code(
         await message.answer("❌ Operação cancelada.")
         return
 
+    # Extrai só dígitos
+    code_typed = "".join(c for c in raw if c.isdigit())
+
+    if len(code_typed) != 6:
+        await message.answer(
+            "❌ <b>Código inválido.</b>\n"
+            "Envie os 6 dígitos recebidos no e-mail."
+        )
+        return
+
     data = await state.get_data()
-    expected = data.get("recovery_code")
     email = data.get("recovery_email")
 
-    if not expected or not email:
+    if not email:
         await message.answer("❌ Sessão expirada.")
         await state.clear()
         return
 
-    if raw != expected:
-        await message.answer("❌ Código incorreto. Tente novamente.")
+    # Valida (persistente)
+    result = await email_verification.verify_email_change(
+        session=session,
+        user=user,
+        email=email,
+        code=code_typed,
+    )
+
+    if not result.get("success"):
+        error = result.get("error", "Código incorreto")
+        attempts = result.get("attempts_remaining")
+        locked = result.get("locked")
+        expired = result.get("expired")
+
+        if locked:
+            await message.answer(f"🚫 {error}")
+            await state.clear()
+            return
+
+        if expired:
+            await message.answer(
+                f"⏰ {error}\n\nEnvie /start e refaça o processo."
+            )
+            await state.clear()
+            return
+
+        extra = ""
+        if attempts is not None:
+            extra = f"\n\nTentativas restantes: <b>{attempts}</b>"
+
+        await message.answer(f"❌ {error}{extra}")
         return
 
-    user.email = email
-    user.email_verified = True
-    session.add(user)
-
+    # ✓ Sucesso
     await state.clear()
 
     await message.answer(
         f"✅ <b>E-mail cadastrado com sucesso!</b>\n\n"
-        f"📧 <code>{email}</code>"
+        f"📧 <code>{email}</code>\n\n"
+        f"💡 Agora você pode recuperar sua senha de saque "
+        f"caso esqueça."
     )
 
 
@@ -541,9 +628,8 @@ async def cb_choose_pix_type(
     user: User,
     session: AsyncSession,
 ) -> None:
-    # form: wd:pix_cpf: , wd:pix_email: , etc
-    raw = callback.data.split(":")[1]  # "pix_cpf"
-    pix_type = raw.replace("pix_", "")  # "cpf"
+    raw = callback.data.split(":")[1]
+    pix_type = raw.replace("pix_", "")
 
     await state.update_data(pix_type=pix_type)
 
@@ -678,7 +764,7 @@ async def cb_confirm_withdrawal(
             [InlineKeyboardButton(text="❌ Cancelar", callback_data="wd:cancelar")],
             [InlineKeyboardButton(
                 text="🔑 Esqueci a senha",
-                callback_data="aff:recuperar_email",
+                callback_data="aff:recuperar_senha",
             )],
         ]
     )
@@ -782,14 +868,19 @@ async def msg_verify_withdrawal_password(
 
 
 # ============================================
-# 🔑 RECUPERAÇÃO DE SENHA
+# 🔑 RECUPERAÇÃO DE SENHA (persistente)
 # ============================================
-@router.callback_query(F.data == "aff:recuperar_email")
+@router.callback_query(F.data == "aff:recuperar_senha")
 async def cb_recover_password(
     callback: CallbackQuery,
+    state: FSMContext,
     user: User,
     session: AsyncSession,
 ) -> None:
+    """
+    Cliente quer recuperar a senha de saque.
+    Envia código pro e-mail cadastrado.
+    """
     if not user.email or not user.email_verified:
         text = (
             f"❌ <b>E-mail não cadastrado.</b>\n\n"
@@ -808,36 +899,160 @@ async def cb_recover_password(
         await callback.answer()
         return
 
-    # Envia código
-    code = email_service.generate_verification_code()
-
-    from bot.states.states import AffiliateStates as AS
-
-    # Não tem state aqui, vamos usar um simples
-    from aiogram.fsm.context import FSMContext
-    # (Vamos usar o mesmo state de recovery)
-
-    result = await email_service.send_verification_code(
-        to_email=user.email,
-        code=code,
-        purpose="Recuperação de senha",
+    # Envia código de recuperação (persistente)
+    result = await email_verification.send_password_recovery(
+        session=session,
+        email=user.email,
+        telegram_id=user.telegram_id,
     )
 
     if not result.get("success"):
-        await callback.answer(
-            f"❌ Erro ao enviar: {result.get('error', 'Erro')}",
-            show_alert=True,
-        )
+        error = result.get("error", "Erro desconhecido")
+        cooldown = result.get("cooldown_seconds")
+
+        if cooldown:
+            await callback.answer(
+                f"⏰ Aguarde {cooldown}s", show_alert=True
+            )
+        else:
+            await callback.answer(f"❌ {error}", show_alert=True)
         return
+
+    expiration = result.get("expiration_minutes", 15)
 
     text = (
         f"📩 <b>Código enviado!</b>\n\n"
-        f"Enviamos um código para <b>{user.email}</b>.\n\n"
-        f"Digite o código de 6 dígitos recebido para redefinir sua senha."
+        f"Enviamos um código para:\n"
+        f"📧 <b>{_mask_email(user.email)}</b>\n\n"
+        f"Digite o código de <b>6 dígitos</b> recebido:\n\n"
+        f"<i>O código expira em {expiration} minutos.</i>"
     )
 
-    await _edit_or_send(callback, text, None)
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="❌ Cancelar", callback_data="wd:cancelar")],
+        ]
+    )
+
+    await _edit_or_send(callback, text, keyboard)
     await callback.answer()
+
+    await state.set_state(AffiliateStates.waiting_recovery_code)
+
+
+# ============================================
+# 🔑 VALIDAR CÓDIGO DE RECUPERAÇÃO
+# ============================================
+@router.message(AffiliateStates.waiting_recovery_code, F.text.regexp(r"^\d{6}$"))
+async def msg_verify_password_recovery(
+    message: Message,
+    state: FSMContext,
+    user: User,
+    session: AsyncSession,
+) -> None:
+    """
+    Valida o código e pede a nova senha.
+    """
+    raw = (message.text or "").strip()
+
+    if not user.email:
+        await message.answer("❌ Sessão expirada.")
+        await state.clear()
+        return
+
+    # Valida código (persistente)
+    result = await email_verification.verify_password_recovery(
+        session=session,
+        email=user.email,
+        code=raw,
+    )
+
+    if not result.get("success"):
+        error = result.get("error", "Código incorreto")
+        attempts = result.get("attempts_remaining")
+        locked = result.get("locked")
+        expired = result.get("expired")
+
+        if locked:
+            await message.answer(f"🚫 {error}")
+            await state.clear()
+            return
+
+        if expired:
+            await message.answer(
+                f"⏰ {error}\n\nEnvie /start e refaça o processo."
+            )
+            await state.clear()
+            return
+
+        extra = ""
+        if attempts is not None:
+            extra = f"\n\nTentativas restantes: <b>{attempts}</b>"
+
+        await message.answer(f"❌ {error}{extra}")
+        return
+
+    # ✓ Código válido → pede nova senha
+    await message.answer(
+        f"✅ <b>Código validado!</b>\n\n"
+        f"🔐 Agora envie sua <b>nova senha de saque</b>.\n\n"
+        f"Use de 4 a 8 dígitos numéricos.\n"
+        f"Exemplo: <code>1234</code>"
+    )
+
+    await state.set_state(AffiliateStates.waiting_new_password)
+
+
+# ============================================
+# 🔐 SALVAR NOVA SENHA (após recuperação)
+# ============================================
+@router.message(AffiliateStates.waiting_new_password)
+async def msg_save_new_password(
+    message: Message,
+    state: FSMContext,
+    user: User,
+    session: AsyncSession,
+) -> None:
+    raw = (message.text or "").strip()
+
+    if raw.startswith("/cancelar") or raw.startswith("/start"):
+        await state.clear()
+        await message.answer("❌ Operação cancelada.")
+        return
+
+    if not raw.isdigit() or not (4 <= len(raw) <= 8):
+        await message.answer(
+            "❌ Senha inválida.\n\n"
+            "Use de 4 a 8 dígitos numéricos.\n"
+            "Exemplo: <code>1234</code>"
+        )
+        return
+
+    # Hasheia
+    try:
+        from passlib.hash import bcrypt
+        hashed = bcrypt.hash(raw)
+    except Exception as e:
+        logger.exception(f"❌ Erro ao hashear senha: {e}")
+        await message.answer("❌ Erro ao salvar. Tente novamente.")
+        return
+
+    user.withdrawal_password_hash = hashed
+    session.add(user)
+
+    await state.clear()
+
+    # Tenta deletar a mensagem com a senha
+    try:
+        await message.delete()
+    except Exception:
+        pass
+
+    await message.answer(
+        f"✅ <b>Senha de saque redefinida!</b>\n\n"
+        f"Sua nova senha está ativa.\n"
+        f"Guarde-a em local seguro."
+    )
 
 
 # ============================================
@@ -853,13 +1068,12 @@ async def cb_cancel_withdrawal(
     await state.clear()
     await callback.answer("❌ Operação cancelada.", show_alert=True)
 
-    # Volta pro menu de afiliados
     callback.data = "menu:afiliados"
     await cb_affiliate_menu(callback, user, session)
 
 
 # ============================================
-# 🏦 CADASTRAR BANCO (redireciona pro Mini App)
+# 🏦 CADASTRAR BANCO
 # ============================================
 @router.callback_query(F.data == "aff:cadastrar_banco")
 async def cb_register_bank(

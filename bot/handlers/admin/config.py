@@ -3,10 +3,21 @@
 # ============================================
 # Handlers do menu de CONFIGURAÇÕES do painel admin.
 # Todos leem/gravam do banco em tempo real.
+#
+# ✨ CORRIGIDO:
+#   - Removidos os 2 handlers de "Em breve"
+#   - Cada submenu tem seu próprio router dedicado
+#   - Este arquivo só cuida do menu PRINCIPAL de config
+#   - Handlers específicos (adm_cfg:*, adm_gen:*) agora
+#     vivem nos arquivos certos
 # ============================================
 
 from aiogram import F, Router
-from aiogram.types import CallbackQuery
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -60,7 +71,7 @@ async def cb_config_menu(
 
 
 # ============================================
-# CALLBACK: configurações gerais
+# CALLBACK: configurações gerais (adm_cfg:gerais)
 # ============================================
 @router.callback_query(F.data == "adm_cfg:gerais")
 async def cb_config_gerais(
@@ -111,88 +122,41 @@ async def cb_config_gerais(
 # ============================================
 # CALLBACK: submenus ainda não implementados
 # ============================================
+# ⚠️ Estes são mantidos APENAS como fallback de segurança.
+# Cada submenu tem seu próprio handler em outro arquivo:
+#
+#   - adm_cfg:admins     → bot/handlers/admin/admins.py
+#   - adm_cfg:afiliados  → bot/handlers/admin/affiliates.py
+#   - adm_cfg:usuarios   → bot/handlers/admin/users.py
+#   - adm_cfg:pix        → bot/handlers/admin/pix.py
+#   - adm_cfg:logins     → bot/handlers/admin/products.py
+#   - adm_cfg:pesquisa   → bot/handlers/admin/search.py
+#   - adm_cfg:messages   → bot/handlers/admin/messages.py
+#   - adm_cfg:buttons    → bot/handlers/admin/buttons.py
+#   - adm_cfg:images     → bot/handlers/admin/images.py
+#
+# Este handler SÓ é acionado se o específico falhar.
+# ============================================
 @router.callback_query(F.data.startswith("adm_cfg:"))
-async def cb_config_placeholder(
+async def cb_config_fallback(
     callback: CallbackQuery,
     session: AsyncSession,
 ) -> None:
+    """
+    Fallback de segurança — só roda se um específico falhar.
+    Redireciona pro menu principal de config.
+    """
     if not await _is_admin(session, callback.from_user.id):
         await callback.answer("🚫 Sem acesso.", show_alert=True)
         return
 
-    section = callback.data.split(":", 1)[1]
-    messages = {
-        "admins": "👮 <b>CONFIGURAR ADMINS</b>\n\nEm breve: adicionar, remover e listar admins.",
-        "afiliados": "🤝 <b>CONFIGURAR AFILIADOS</b>\n\nEm breve: comissão, pontos, saque mínimo.",
-        "usuarios": "👥 <b>CONFIGURAR USUÁRIOS</b>\n\nEm breve: pesquisar, editar saldo, bloquear.",
-        "pix": "💳 <b>CONFIGURAR PIX</b>\n\nEm breve: token MP, limites, bônus, expiração.",
-        "logins": "🔐 <b>CONFIGURAR LOGINS</b>\n\nEm breve: adicionar, remover e gerenciar estoque.",
-        "pesquisa": "🔎 <b>CONFIGURAR PESQUISA</b>\n\nEm breve: sistema de busca, imagens, resultados.",
-        "messages": "📝 <b>EDITOR DE MENSAGENS</b>\n\nEm breve: editar todas as mensagens do bot.",
-        "buttons": "🔘 <b>EDITOR DE BOTÕES</b>\n\nEm breve: editar textos, posições e ações.",
-        "images": "🖼️ <b>GERENCIAR IMAGENS</b>\n\nEm breve: adicionar, remover e definir imagens.",
-    }
-
-    text = messages.get(section, "⚙️ <b>Em construção</b>")
-    text += "\n\n🔙 Use o botão abaixo para voltar."
-
-    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🔙 Voltar", callback_data="adm:config")]
-        ]
+    logger.warning(
+        f"⚠️ Fallback de config acionado para: {callback.data}"
     )
 
-    try:
-        await callback.message.edit_text(text, reply_markup=keyboard)
-    except Exception:
-        await callback.message.answer(text, reply_markup=keyboard)
-
-    await callback.answer()
-
-
-# ============================================
-# CALLBACK: submenus das configs gerais
-# ============================================
-@router.callback_query(F.data.startswith("adm_gen:"))
-async def cb_gen_placeholder(
-    callback: CallbackQuery,
-    session: AsyncSession,
-) -> None:
-    if not await _is_admin(session, callback.from_user.id):
-        await callback.answer("🚫 Sem acesso.", show_alert=True)
-        return
-
-    action = callback.data.split(":", 1)[1]
-    messages = {
-        "renew": "🔄 <b>RENOVAR PLANO</b>\n\nEm breve: renovação do plano do bot.",
-        "restart": "🔁 <b>REINICIAR BOT</b>\n\nEm breve: reinício real do serviço.",
-        "maintenance": "🔧 <b>MANUTENÇÃO</b>\n\nEm breve: ativar/desativar manutenção.",
-        "support": "🛡 <b>MUDAR SUPORTE</b>\n\nEm breve: alterar link de suporte.",
-        "separator": "🔣 <b>MUDAR SEPARADOR</b>\n\nEm breve: alterar caractere separador.",
-        "logs_channel": "📢 <b>MUDAR DESTINO LOG</b>\n\nEm breve: alterar canal de logs.",
-        "antiflood": "🛡 <b>ANTI-FLOOD</b>\n\nEm breve: configurar limites e bloqueios.",
-        "blocks": "🚫 <b>BLOQUEIOS</b>\n\nEm breve: gerenciar usuários bloqueados.",
-    }
-
-    text = messages.get(action, "⚙️ <b>Em construção</b>")
-    text += "\n\n🔙 Use o botão abaixo para voltar."
-
-    from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🔙 Voltar", callback_data="adm_cfg:gerais")]
-        ]
-    )
-
-    try:
-        await callback.message.edit_text(text, reply_markup=keyboard)
-    except Exception:
-        await callback.message.answer(text, reply_markup=keyboard)
-
-    await callback.answer()
+    # Volta pro menu de config
+    callback.data = "adm:config"
+    await cb_config_menu(callback, session)
 
 
 # ============================================
@@ -207,3 +171,9 @@ async def _load_configs(
     result = await session.execute(stmt)
     rows = {c.key: c.value for c in result.scalars().all()}
     return {k: rows.get(k) for k in keys}
+
+
+# ============================================
+# IMPORT (no final pra evitar circular)
+# ============================================
+from loguru import logger  # noqa: E402

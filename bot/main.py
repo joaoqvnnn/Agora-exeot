@@ -3,7 +3,7 @@
 # ============================================
 # Arquivo principal que sobe TUDO:
 #   - FastAPI (webhook Telegram + webhooks externos)
-#   - Rotas da API (webapp, activation, static)
+#   - Rotas da API (webapp, activation, whatsapp)
 #   - Bot do Telegram (via webhook)
 #   - APScheduler (tarefas agendadas)
 #   - Startup / Shutdown
@@ -24,19 +24,34 @@ from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 # ============================================
-# 📥 IMPORTAÇÕES DO PROJETO
+# 📥 WEBHOOKS EXTERNOS
 # ============================================
 from api.webhooks.mercadopago import router as mercadopago_router
+from api.webhooks.whatsapp import router as whatsapp_webhook_router
+
+# ============================================
+# 📥 ROTAS DA API
+# ============================================
 from api.routes.static import router as static_router
 from api.routes.webapp import router as webapp_router
 from api.routes.activation import router as activation_router
+from api.routes.whatsapp_flow import router as whatsapp_flow_router
 
+# ============================================
+# 📥 BOT
+# ============================================
 from bot.loader import bot, dp, close_bots
 from bot.handlers import register_all_handlers
+
+# ============================================
+# 📥 CORE
+# ============================================
 from core.config import settings
 from core.database import close_database, init_database
 
-# Jobs agendados
+# ============================================
+# 📥 JOBS AGENDADOS
+# ============================================
 from bot.jobs.abandoned_product import job_abandoned_product
 from bot.jobs.check_stock import job_check_stock
 from bot.jobs.clean_logs import job_clean_logs
@@ -101,6 +116,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.debug(f"⚠️ Falha ao notificar online: {e}")
 
+    # 6. Verifica conexão WhatsApp (informativo)
+    try:
+        await check_whatsapp_status()
+    except Exception as e:
+        logger.debug(f"⚠️ WhatsApp check: {e}")
+
     logger.success("🎉 Larizinha Store pronta!")
 
     yield
@@ -136,7 +157,7 @@ async def lifespan(app: FastAPI):
 # ============================================
 app = FastAPI(
     title="Larizinha Store API",
-    description="Bot + Webhooks + Mini App backend",
+    description="Bot + Webhooks + Mini App + WhatsApp",
     version="4.1.0",
     lifespan=lifespan,
     docs_url="/docs",
@@ -154,7 +175,7 @@ app.add_middleware(
         "https://telegram.org",
         "*",  # Telegram WebApp roda em iframe
     ],
-    allow_credentials=False,  # Não usamos cookies
+    allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["*"],
@@ -165,14 +186,16 @@ app.add_middleware(
 # 📥 REGISTRA TODOS OS ROUTERS
 # ============================================
 
-# Webhooks externos
+# ─── Webhooks externos ───
 app.include_router(mercadopago_router)
+app.include_router(whatsapp_webhook_router)
 
-# Rotas da API
+# ─── Rotas da API ───
+app.include_router(whatsapp_flow_router)
 app.include_router(webapp_router)
 app.include_router(activation_router)
 
-# Arquivos estáticos do WebApp (por último)
+# ─── Arquivos estáticos do WebApp (por último) ───
 app.include_router(static_router)
 
 
@@ -200,6 +223,7 @@ async def health():
         "status": "healthy" if db_ok else "degraded",
         "database": "ok" if db_ok else "down",
         "webapp": "ok",
+        "whatsapp_webhook": "ok",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -229,7 +253,7 @@ async def telegram_webhook(request: Request) -> Response:
 
 
 # ============================================
-# 🔧 SETUP DO WEBHOOK
+# 🔧 SETUP DO WEBHOOK DO TELEGRAM
 # ============================================
 async def setup_telegram_webhook() -> None:
     """Configura o webhook do Telegram."""
@@ -449,6 +473,43 @@ async def notify_bot_online() -> None:
                     pass
     except Exception as e:
         logger.debug(f"⚠️ Falha ao notificar online: {e}")
+
+
+# ============================================
+# 📱 VERIFICA STATUS DO WHATSAPP (informativo)
+# ============================================
+async def check_whatsapp_status() -> None:
+    """
+    Verifica se o serviço de WhatsApp está configurado
+    e conectado. Apenas loga — não bloqueia startup.
+    """
+    if not settings.whatsapp_api_url:
+        logger.info("📱 WhatsApp não configurado (whatsapp_api_url vazio)")
+        return
+
+    try:
+        from core.services import wa_client
+
+        status = await wa_client.get_status()
+
+        if status.get("ok") and status.get("connected"):
+            logger.success(
+                f"📱 WhatsApp conectado: {status.get('push_name')} "
+                f"({status.get('phone_number')})"
+            )
+        elif status.get("has_qr"):
+            qr_url = wa_client.get_qr_url()
+            logger.warning(
+                f"📱 WhatsApp aguardando escaneamento do QR\n"
+                f"   👉 Acesse: {qr_url}"
+            )
+        else:
+            logger.warning(
+                f"📱 WhatsApp não conectado: "
+                f"{status.get('error', 'status desconhecido')}"
+            )
+    except Exception as e:
+        logger.debug(f"⚠️ Falha ao verificar WhatsApp: {e}")
 
 
 # ============================================

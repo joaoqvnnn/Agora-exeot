@@ -5,7 +5,7 @@
 #   - FastAPI (webhook Telegram + webhooks externos)
 #   - Rotas da API (webapp, activation, whatsapp)
 #   - Bot do Telegram (via webhook)
-#   - APScheduler (tarefas agendadas)
+#   - APScheduler (9 jobs agendados)
 #   - Startup / Shutdown
 #
 # ⚠️ Este é o arquivo que o Render executa.
@@ -50,11 +50,12 @@ from core.config import settings
 from core.database import close_database, init_database
 
 # ============================================
-# 📥 JOBS AGENDADOS
+# 📥 JOBS AGENDADOS (9 JOBS)
 # ============================================
 from bot.jobs.abandoned_product import job_abandoned_product
 from bot.jobs.check_stock import job_check_stock
 from bot.jobs.clean_logs import job_clean_logs
+from bot.jobs.clean_spam import job_clean_spam
 from bot.jobs.expire_payments import job_expire_payments
 from bot.jobs.expire_products import job_expire_products
 from bot.jobs.expire_reservations import job_expire_reservations
@@ -322,7 +323,7 @@ async def setup_bot_commands() -> None:
 
 
 # ============================================
-# ⏰ AGENDADOR DE TAREFAS
+# ⏰ AGENDADOR DE TAREFAS (9 JOBS)
 # ============================================
 def setup_scheduler() -> None:
     """
@@ -337,6 +338,9 @@ def setup_scheduler() -> None:
       • Abandono de produto
       • Carrinhos abandonados (WebApp)
       • Estoque baixo
+
+      ─── Limpeza (30 min) ───
+      • Caches em memória (spam, tentativas)
 
       ─── Lentos (1h+) ───
       • Produtos expirados
@@ -411,6 +415,17 @@ def setup_scheduler() -> None:
         args=[bot],
         replace_existing=True,
         misfire_grace_time=120,
+        max_instances=1,
+    )
+
+    # ─── Limpar caches em memória (30 min) ───
+    scheduler.add_job(
+        job_clean_spam,
+        "interval",
+        minutes=30,
+        id="clean_spam",
+        replace_existing=True,
+        misfire_grace_time=300,
         max_instances=1,
     )
 

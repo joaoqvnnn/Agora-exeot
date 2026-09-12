@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0f0f14" id="theme-color-meta">
+    <meta name="description" content="Larizinha Store - Entrega automática de streamings e contas premium">
+
+    <title>Larizinha Store</title>
+
+    <!-- ============================================
+         🚀 TELEGRAM WEBAPP SDK
+         ============================================ -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- ============================================
+         🔤 FONTES
+         ============================================ -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- ============================================
+         🎨 FONT AWESOME (ícones)
+         ============================================ -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- ============================================
+         💅 CSS
+         ============================================ -->
+    <link rel="stylesheet" href="/webapp/static/style.css">
+
+    <!-- ============================================
+         ⚙️ CONFIGURAÇÃO INICIAL (fallback)
+         ============================================ -->
+    <style>
+        /* Fallback enquanto o CSS/config não carrega */
+        :root {
+            --color-primary: #7c5cff;
+            --color-primary-light: #a78bfa;
+            --color-primary-dark: #4f46e5;
+            --color-accent: #4f46e5;
+            --color-success: #10b981;
+            --color-warning: #f59e0b;
+            --color-danger: #ef4444;
+
+            --bg-base: #0a0a0f;
+            --bg-surface: #14141c;
+            --bg-elevated: #1c1c28;
+            --bg-overlay: #232334;
+
+            --text-primary: #ffffff;
+            --text-secondary: #b4b4c8;
+            --text-muted: #6b6b80;
+
+            --border-subtle: #2a2a3a;
+            --border-strong: #3a3a4d;
+
+            --radius-sm: 8px;
+            --radius-md: 14px;
+            --radius-lg: 20px;
+            --radius-xl: 28px;
+
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+            --shadow-md: 0 8px 24px rgba(0,0,0,0.4);
+            --shadow-lg: 0 16px 48px rgba(0,0,0,0.5);
+            --shadow-glow: 0 0 40px rgba(124,92,255,0.4);
+
+            --transition-fast: 0.15s ease;
+            --transition-base: 0.25s ease;
+            --transition-slow: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            height: 100%;
+            overflow-x: hidden;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-base);
+            color: var(--text-primary);
+            font-size: 15px;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow-y: auto;
+        }
+
+        /* Splash screen enquanto carrega */
+        #splash {
+            position: fixed;
+            inset: 0;
+            background: var(--bg-base);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.4s ease, visibility 0.4s ease;
+        }
+
+        #splash.hidden {
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .splash-logo {
+            width: 80px;
+            height: 80px;
+            border-radius: 24px;
+            background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            margin-bottom: 24px;
+            animation: splashPulse 1.5s ease-in-out infinite;
+            box-shadow: var(--shadow-glow);
+        }
+
+        .splash-text {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .splash-sub {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        @keyframes splashPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.06); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ============================================
+     🎬 SPLASH SCREEN
+     ============================================ -->
+<div id="splash">
+    <div class="splash-logo" id="splash-logo">🎬</div>
+    <div class="splash-text" id="splash-name">Larizinha Store</div>
+    <div class="splash-sub">Carregando...</div>
+</div>
+
+<!-- ============================================
+     🏠 APP PRINCIPAL
+     ============================================ -->
+<div id="app" class="app" style="display: none;">
+
+    <!-- ==========================================
+         🎯 HEADER STICKY
+         ========================================== -->
+    <header class="app-header" id="app-header">
+        <div class="header-content">
+
+            <!-- Logo + Nome -->
+            <div class="header-brand">
+                <div class="header-logo" id="header-logo">
+                    <img src="" alt="" id="header-logo-img" style="display: none;">
+                    <span id="header-logo-emoji">🎬</span>
+                </div>
+                <div class="header-title">
+                    <div class="header-name" id="header-name">Larizinha Store</div>
+                    <div class="header-status">
+                        <span class="status-dot"></span>
+                        <span>Online agora</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Saldo + Carrinho -->
+            <div class="header-actions">
+                <button class="header-balance" id="header-balance" aria-label="Meu saldo">
+                    <i class="fa-solid fa-wallet"></i>
+                    <span class="header-balance-value" id="header-balance-value">R$ 0,00</span>
+                </button>
+
+                <button class="header-cart-btn" id="header-cart-btn" aria-label="Carrinho">
+                    <i class="fa-solid fa-bag-shopping"></i>
+                    <span class="header-cart-badge" id="header-cart-badge" style="display: none;">0</span>
+                </button>
+            </div>
+
+        </div>
+
+        <!-- Banner (aparece se configurado) -->
+        <div class="banner" id="banner" style="display: none;">
+            <i class="fa-solid fa-bullhorn banner-icon"></i>
+            <span class="banner-text" id="banner-text"></span>
+            <button class="banner-close" id="banner-close" aria-label="Fechar">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- ==========================================
+         📱 CONTEÚDO
+         ========================================== -->
+    <main class="app-content" id="app-content">
+
+        <!-- ─── BUSCA ─── -->
+        <div class="search-wrapper">
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input
+                    type="text"
+                    class="search-input"
+                    id="search-input"
+                    placeholder="Pesquisar produtos..."
+                    autocomplete="off"
+                >
+                <button class="search-clear" id="search-clear" style="display: none;" aria-label="Limpar">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- ─── CATEGORIAS (tabs scroll horizontal) ─── -->
+        <div class="categories-wrapper">
+            <div class="categories-scroll" id="categories-scroll">
+                <!-- Preenchido pelo JS -->
+            </div>
+        </div>
+
+        <!-- ─── CATÁLOGO ─── -->
+        <section class="section" id="catalog-section">
+
+            <!-- Header da seção -->
+            <div class="section-header">
+                <h2 class="section-title" id="section-title">
+                    <i class="fa-solid fa-fire"></i>
+                    <span>Catálogo</span>
+                </h2>
+                <span class="section-count" id="section-count"></span>
+            </div>
+
+            <!-- Grid de produtos (skeleton loader enquanto carrega) -->
+            <div class="products-grid" id="products-grid">
+                <!-- Preenchido pelo JS -->
+            </div>
+
+            <!-- Empty state -->
+            <div class="empty-state" id="empty-state" style="display: none;">
+                <div class="empty-icon">
+                    <i class="fa-solid fa-box-open"></i>
+                </div>
+                <div class="empty-title">Nenhum produto encontrado</div>
+                <div class="empty-text" id="empty-text">
+                    Tente pesquisar outro termo
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- ==========================================
+         📱 BOTTOM NAVIGATION
+         ========================================== -->
+    <nav class="bottom-nav" id="bottom-nav">
+        <button class="nav-item active" data-nav="store" id="nav-store">
+            <i class="fa-solid fa-store"></i>
+            <span>Loja</span>
+        </button>
+
+        <button class="nav-item" data-nav="recharge" id="nav-recharge">
+            <i class="fa-solid fa-wallet"></i>
+            <span>Recarga</span>
+        </button>
+
+        <button class="nav-item nav-item-center" data-nav="cart" id="nav-cart">
+            <div class="nav-center-btn">
+                <i class="fa-solid fa-bag-shopping"></i>
+                <span class="nav-center-badge" id="nav-center-badge" style="display: none;">0</span>
+            </div>
+            <span>Carrinho</span>
+        </button>
+
+        <button class="nav-item" data-nav="history" id="nav-history">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+            <span>Pedidos</span>
+        </button>
+
+        <button class="nav-item" data-nav="profile" id="nav-profile">
+            <i class="fa-solid fa-user"></i>
+            <span>Perfil</span>
+        </button>
+    </nav>
+
+</div>
+
+<!-- ============================================
+     🛒 DRAWER DO CARRINHO
+     ============================================ -->
+<div class="drawer-backdrop" id="drawer-backdrop"></div>
+
+<aside class="cart-drawer" id="cart-drawer">
+    <div class="cart-header">
+        <div class="cart-title">
+            <i class="fa-solid fa-bag-shopping"></i>
+            <span>Seu Carrinho</span>
+        </div>
+        <button class="cart-close" id="cart-close" aria-label="Fechar">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+
+    <div class="cart-body" id="cart-body">
+        <!-- Preenchido pelo JS -->
+    </div>
+
+    <div class="cart-footer" id="cart-footer">
+        <div class="cart-summary">
+            <div class="cart-summary-row">
+                <span>Itens</span>
+                <span id="cart-items-count">0</span>
+            </div>
+            <div class="cart-summary-row cart-summary-total">
+                <span>Total</span>
+                <span id="cart-total">R$ 0,00</span>
+            </div>
+            <div class="cart-summary-row cart-summary-balance">
+                <span>Seu saldo</span>
+                <span id="cart-balance">R$ 0,00</span>
+            </div>
+        </div>
+
+        <button class="btn btn-primary btn-block btn-lg" id="cart-checkout-btn">
+            <i class="fa-solid fa-credit-card"></i>
+            <span>Finalizar Compra</span>
+        </button>
+
+        <button class="btn btn-ghost btn-block" id="cart-clear-btn">
+            <i class="fa-solid fa-trash-can"></i>
+            <span>Limpar carrinho</span>
+        </button>
+    </div>
+</aside>
+
+<!-- ============================================
+     🔍 MODAL DE PRODUTO
+     ============================================ -->
+<div class="modal-backdrop" id="modal-backdrop"></div>
+
+<div class="modal" id="product-modal">
+    <div class="modal-handle"></div>
+
+    <div class="modal-body" id="product-modal-body">
+        <!-- Preenchido pelo JS -->
+    </div>
+</div>
+
+<!-- ============================================
+     ✅ MODAL DE SUCESSO
+     ============================================ -->
+<div class="modal-success" id="success-modal">
+    <div class="success-icon">
+        <i class="fa-solid fa-check"></i>
+    </div>
+    <div class="success-title" id="success-title">Sucesso!</div>
+    <div class="success-text" id="success-text"></div>
+    <button class="btn btn-primary btn-block" id="success-close-btn">
+        Continuar
+    </button>
+</div>
+
+<!-- ============================================
+     🔔 TOAST CONTAINER
+     ============================================ -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ============================================
+     ⏳ LOADING OVERLAY
+     ============================================ -->
+<div class="loading-overlay" id="loading-overlay" style="display: none;">
+    <div class="loading-spinner"></div>
+    <div class="loading-text" id="loading-text">Carregando...</div>
+</div>
+
+<!-- ============================================
+     🚀 SCRIPT
+     ============================================ -->
+<script src="/webapp/static/app.js"></script>
+
+</body>
+</html>

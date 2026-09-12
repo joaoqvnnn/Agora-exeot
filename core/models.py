@@ -53,63 +53,63 @@ from core.database import Base
 
 class UserStatus(str, enum.Enum):
     """Status do usuário no sistema."""
-    ACTIVE = "active"           # Ativo normal
-    BLOCKED = "blocked"         # Bloqueado (anti-flood, ban manual)
-    BANNED = "banned"           # Banido permanente
+    ACTIVE = "active"
+    BLOCKED = "blocked"
+    BANNED = "banned"
 
 
 class ProductStatus(str, enum.Enum):
     """Status do produto."""
-    ACTIVE = "active"           # Visível pra venda
-    PAUSED = "paused"           # Pausado (não aparece)
-    HIDDEN = "hidden"           # Oculto (só por link direto)
-    DELETED = "deleted"         # Marcado como excluído
+    ACTIVE = "active"
+    PAUSED = "paused"
+    HIDDEN = "hidden"
+    DELETED = "deleted"
 
 
 class StockStatus(str, enum.Enum):
     """Status de cada unidade de estoque (login)."""
-    AVAILABLE = "available"     # Disponível pra venda
-    RESERVED = "reserved"       # Reservado (alguém tá comprando)
-    SOLD = "sold"               # Vendido
-    DELIVERED = "delivered"     # Entregue ao cliente
-    EXPIRED = "expired"         # Venceu
-    CANCELLED = "cancelled"     # Cancelado
+    AVAILABLE = "available"
+    RESERVED = "reserved"
+    SOLD = "sold"
+    DELIVERED = "delivered"
+    EXPIRED = "expired"
+    CANCELLED = "cancelled"
 
 
 class OrderStatus(str, enum.Enum):
     """Status do pedido."""
-    PENDING = "pending"         # Aguardando pagamento
-    PAID = "paid"               # Pago
-    DELIVERED = "delivered"     # Entregue
-    CANCELLED = "cancelled"     # Cancelado
-    REFUNDED = "refunded"       # Estornado
-    EXPIRED = "expired"         # Expirado
+    PENDING = "pending"
+    PAID = "paid"
+    DELIVERED = "delivered"
+    CANCELLED = "cancelled"
+    REFUNDED = "refunded"
+    EXPIRED = "expired"
 
 
 class PaymentStatus(str, enum.Enum):
     """Status do pagamento Pix."""
-    PENDING = "pending"         # Aguardando pagamento
-    APPROVED = "approved"       # Aprovado
-    REJECTED = "rejected"       # Rejeitado
-    EXPIRED = "expired"         # Expirado
-    REFUNDED = "refunded"       # Estornado
-    CANCELLED = "cancelled"     # Cancelado
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+    REFUNDED = "refunded"
+    CANCELLED = "cancelled"
 
 
 class PaymentType(str, enum.Enum):
     """Tipo do pagamento."""
-    RECHARGE = "recharge"       # Recarga de saldo
-    PURCHASE = "purchase"       # Compra de produto
+    RECHARGE = "recharge"
+    PURCHASE = "purchase"
 
 
 class WithdrawalStatus(str, enum.Enum):
     """Status do saque."""
-    PENDING = "pending"         # Aguardando aprovação
-    PROCESSING = "processing"   # Processando
-    PAID = "paid"               # Pago
-    REJECTED = "rejected"       # Recusado
-    REFUNDED = "refunded"       # Estornado (voltou pro saldo)
-    CANCELLED = "cancelled"     # Cancelado pelo usuário
+    PENDING = "pending"
+    PROCESSING = "processing"
+    PAID = "paid"
+    REJECTED = "rejected"
+    REFUNDED = "refunded"
+    CANCELLED = "cancelled"
 
 
 class WithdrawalMethod(str, enum.Enum):
@@ -138,12 +138,12 @@ class AlertType(str, enum.Enum):
 
 class BroadcastStatus(str, enum.Enum):
     """Status do broadcast."""
-    DRAFT = "draft"             # Rascunho
-    SCHEDULED = "scheduled"     # Agendado
-    SENDING = "sending"         # Enviando
-    SENT = "sent"               # Enviado
-    FAILED = "failed"           # Falhou
-    CANCELLED = "cancelled"     # Cancelado
+    DRAFT = "draft"
+    SCHEDULED = "scheduled"
+    SENDING = "sending"
+    SENT = "sent"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class TicketStatus(str, enum.Enum):
@@ -154,14 +154,17 @@ class TicketStatus(str, enum.Enum):
     CLOSED = "closed"
 
 
+class VerificationCodeType(str, enum.Enum):
+    """Tipo de código de verificação."""
+    EMAIL_VERIFICATION = "email_verification"
+    PASSWORD_RECOVERY = "password_recovery"
+    PRODUCT_DELIVERY = "product_delivery"
+    EMAIL_CHANGE = "email_change"
+    WITHDRAWAL_CONFIRM = "withdrawal_confirm"
+
+
 # ============================================
 # ⚙️ CONFIG — Configurações editáveis pelo admin
-# ============================================
-# CORAÇÃO DO PAINEL ADMINISTRATIVO.
-# Cada configuração é uma linha "chave → valor".
-# Ex: "bot_name" → "Larizinha Store"
-#     "pix_min"  → "4.00"
-# O bot lê isso e aplica em tempo real.
 # ============================================
 
 class Config(Base):
@@ -231,7 +234,6 @@ class Admin(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    # Permissões granulares (JSON com lista de permissões)
     permissions: Mapped[dict] = mapped_column(
         JSONB, default=dict, nullable=False,
         comment="Permissões específicas (users, finance, products, etc)",
@@ -267,10 +269,8 @@ class User(Base):
     last_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     language_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
 
-    # Dados de contato
     whatsapp: Mapped[Optional[str]] = mapped_column(
         String(20), nullable=True,
-        comment="Número de WhatsApp (DDD + número)",
     )
     email: Mapped[Optional[str]] = mapped_column(
         String(200), nullable=True,
@@ -279,44 +279,35 @@ class User(Base):
         Boolean, default=False, nullable=False,
     )
 
-    # Saldo e pontos
     balance: Mapped[Decimal] = mapped_column(
         Numeric(10, 2), default=Decimal("0.00"), nullable=False,
     )
     points: Mapped[int] = mapped_column(
         Integer, default=0, nullable=False,
-        comment="Pontos de indicação (convertíveis em saldo)",
     )
     affiliate_balance: Mapped[Decimal] = mapped_column(
         Numeric(10, 2), default=Decimal("0.00"), nullable=False,
-        comment="Saldo de comissões de afiliado",
     )
 
-    # Senha de saque (hash)
     withdrawal_password_hash: Mapped[Optional[str]] = mapped_column(
         String(255), nullable=True,
     )
 
-    # Afiliado
     referred_by: Mapped[Optional[int]] = mapped_column(
         BigInteger, nullable=True, index=True,
-        comment="Telegram ID de quem indicou",
     )
     affiliate_code: Mapped[Optional[str]] = mapped_column(
         String(50), unique=True, nullable=True, index=True,
     )
 
-    # Status e controle
     status: Mapped[UserStatus] = mapped_column(
         SAEnum(UserStatus, name="user_status"),
         default=UserStatus.ACTIVE, nullable=False,
     )
     is_blocked_bot: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False,
-        comment="Bloqueou o bot no Telegram?",
     )
 
-    # Estatísticas
     total_spent: Mapped[Decimal] = mapped_column(
         Numeric(10, 2), default=Decimal("0.00"), nullable=False,
     )
@@ -325,23 +316,18 @@ class User(Base):
     )
     purchases_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    # Controle de estado (última tela vista — pra editar mensagem)
     last_menu: Mapped[Optional[str]] = mapped_column(
         String(50), nullable=True,
-        comment="Última tela (start, catalogo, perfil, etc)",
     )
     last_message_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, nullable=True,
-        comment="ID da última mensagem do bot (pra editar in-place)",
     )
 
-    # Anti-flood
     flood_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     flood_blocked_until: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True,
     )
 
-    # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
     )
@@ -353,7 +339,6 @@ class User(Base):
         DateTime(timezone=True), nullable=True,
     )
 
-    # Relacionamentos
     orders: Mapped[list["Order"]] = relationship(
         "Order", back_populates="user", lazy="selectin",
     )
@@ -367,7 +352,7 @@ class User(Base):
 # ============================================
 
 class Category(Base):
-    """Categoria que agrupa produtos (ex: Streaming, Design)."""
+    """Categoria que agrupa produtos."""
     __tablename__ = "categories"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -377,16 +362,13 @@ class Category(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
-    position: Mapped[int] = mapped_column(
-        Integer, default=0, nullable=False, comment="Ordem de exibição",
-    )
+    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
     )
 
-    # Relacionamentos
     products: Mapped[list["Product"]] = relationship(
         "Product", back_populates="category", lazy="selectin",
     )
@@ -397,7 +379,7 @@ class Category(Base):
 # ============================================
 
 class Product(Base):
-    """Produto/serviço vendido no bot (ex: HBO Max)."""
+    """Produto/serviço vendido no bot."""
     __tablename__ = "products"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -407,60 +389,36 @@ class Product(Base):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     image_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
-    price: Mapped[Decimal] = mapped_column(
-        Numeric(10, 2), nullable=False,
-    )
-    warranty_days: Mapped[int] = mapped_column(
-        Integer, default=30, nullable=False,
-        comment="Dias de garantia",
-    )
-    duration_days: Mapped[int] = mapped_column(
-        Integer, default=30, nullable=False,
-        comment="Duração do produto (validade do login)",
-    )
+    price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    warranty_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
+    duration_days: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
 
     category_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL"), nullable=True,
     )
 
-    # Configurações de venda
     status: Mapped[ProductStatus] = mapped_column(
         SAEnum(ProductStatus, name="product_status"),
         default=ProductStatus.ACTIVE, nullable=False,
     )
-    min_quantity: Mapped[int] = mapped_column(
-        Integer, default=1, nullable=False,
-        comment="Quantidade mínima por compra",
-    )
-    max_quantity: Mapped[int] = mapped_column(
-        Integer, default=10, nullable=False,
-        comment="Quantidade máxima por compra",
-    )
+    min_quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    max_quantity: Mapped[int] = mapped_column(Integer, default=10, nullable=False)
     is_featured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    allow_search: Mapped[bool] = mapped_column(
-        Boolean, default=True, nullable=False,
-        comment="Aparece na pesquisa?",
-    )
+    allow_search: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    # Alertas
     stock_alert_enabled: Mapped[bool] = mapped_column(
         Boolean, default=True, nullable=False,
     )
     stock_alert_threshold: Mapped[int] = mapped_column(
         Integer, default=3, nullable=False,
-        comment="Avisa o admin quando o estoque cair abaixo disso",
     )
 
-    # Ordenação
     position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    # Mensagem de entrega (personalizável)
     delivery_message: Mapped[Optional[str]] = mapped_column(
         Text, nullable=True,
-        comment="Mensagem enviada ao entregar (com variáveis {email} {senha} etc)",
     )
 
-    # Estatísticas
     total_sold: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -471,7 +429,6 @@ class Product(Base):
         onupdate=func.now(), nullable=False,
     )
 
-    # Relacionamentos
     category: Mapped[Optional["Category"]] = relationship(
         "Category", back_populates="products", lazy="selectin",
     )
@@ -482,9 +439,6 @@ class Product(Base):
 
 # ============================================
 # 🔐 STOCK ITEMS — Unidades de estoque (logins)
-# ============================================
-# Cada login é uma linha nesta tabela.
-# Ex: HBO Max tem 4 unidades = 4 linhas com status "available".
 # ============================================
 
 class StockItem(Base):
@@ -498,39 +452,27 @@ class StockItem(Base):
         nullable=False, index=True,
     )
 
-    # Dados do login
     email: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     password: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
-    code: Mapped[Optional[str]] = mapped_column(
-        String(500), nullable=True,
-        comment="Código/link de ativação",
-    )
+    code: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     extra_data: Mapped[dict] = mapped_column(
         JSONB, default=dict, nullable=False,
-        comment="Dados extras (perfil, PIN, etc)",
     )
-    note: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True, comment="Observação pro cliente",
-    )
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # Controle de venda
     status: Mapped[StockStatus] = mapped_column(
         SAEnum(StockStatus, name="stock_status"),
         default=StockStatus.AVAILABLE, nullable=False, index=True,
     )
     reserved_until: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True,
-        comment="Até quando tá reservado (se reservado)",
     )
     reserved_by: Mapped[Optional[int]] = mapped_column(
         BigInteger, nullable=True,
-        comment="Telegram ID de quem reservou",
     )
 
-    # Vínculo com venda
     sold_to: Mapped[Optional[int]] = mapped_column(
         BigInteger, nullable=True, index=True,
-        comment="Telegram ID de quem comprou",
     )
     order_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("orders.id", ondelete="SET NULL"), nullable=True,
@@ -540,14 +482,12 @@ class StockItem(Base):
     )
     expires_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True,
-        comment="Data de vencimento do produto",
     )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
     )
 
-    # Relacionamentos
     product: Mapped["Product"] = relationship(
         "Product", back_populates="stock_items", lazy="selectin",
     )
@@ -565,7 +505,6 @@ class Order(Base):
 
     order_code: Mapped[str] = mapped_column(
         String(50), unique=True, index=True, nullable=False,
-        comment="Código visível do pedido (ex: 81c5465d...)",
     )
 
     user_id: Mapped[int] = mapped_column(
@@ -574,16 +513,12 @@ class Order(Base):
     )
     user_telegram_id: Mapped[int] = mapped_column(
         BigInteger, nullable=False, index=True,
-        comment="Cache do telegram_id do usuário",
     )
 
     product_id: Mapped[int] = mapped_column(
         ForeignKey("products.id", ondelete="SET NULL"), nullable=True,
     )
-    product_name: Mapped[str] = mapped_column(
-        String(200), nullable=False,
-        comment="Cópia do nome no momento da compra",
-    )
+    product_name: Mapped[str] = mapped_column(String(200), nullable=False)
 
     quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     unit_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
@@ -594,20 +529,16 @@ class Order(Base):
         default=OrderStatus.PENDING, nullable=False, index=True,
     )
 
-    # Entrega
     delivery_method: Mapped[str] = mapped_column(
         String(20), default="telegram", nullable=False,
-        comment="telegram, whatsapp, email",
     )
     delivery_target: Mapped[Optional[str]] = mapped_column(
         String(200), nullable=True,
-        comment="Onde entregar (email, whatsapp, telegram_id)",
     )
     delivered_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True,
     )
 
-    # Vencimento do produto
     expires_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True,
     )
@@ -616,7 +547,6 @@ class Order(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False,
     )
 
-    # Relacionamentos
     user: Mapped["User"] = relationship(
         "User", back_populates="orders", lazy="selectin",
     )
@@ -634,11 +564,9 @@ class Payment(Base):
 
     payment_id: Mapped[str] = mapped_column(
         String(100), unique=True, index=True, nullable=False,
-        comment="ID único do pagamento (gerado pelo sistema/MP)",
     )
     external_id: Mapped[Optional[str]] = mapped_column(
         String(100), nullable=True, index=True,
-        comment="ID no Mercado Pago",
     )
 
     user_id: Mapped[int] = mapped_column(
@@ -659,7 +587,6 @@ class Payment(Base):
     )
     total_credited: Mapped[Decimal] = mapped_column(
         Numeric(10, 2), default=Decimal("0.00"), nullable=False,
-        comment="Valor + bônus (o que cai na carteira)",
     )
 
     status: Mapped[PaymentStatus] = mapped_column(
@@ -667,20 +594,15 @@ class Payment(Base):
         default=PaymentStatus.PENDING, nullable=False, index=True,
     )
 
-    # Dados do Pix
-    qr_code: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True, comment="Pix copia e cola",
-    )
+    qr_code: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     qr_code_image_url: Mapped[Optional[str]] = mapped_column(
         String(500), nullable=True,
     )
 
-    # Para compra direta (não-recarga)
     order_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("orders.id", ondelete="SET NULL"), nullable=True,
     )
 
-    # Expiração e prazos
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True,
     )
@@ -688,14 +610,12 @@ class Payment(Base):
         DateTime(timezone=True), nullable=True,
     )
 
-    # Webhook raw (pra debug)
     webhook_data: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
     )
 
-    # Relacionamentos
     user: Mapped["User"] = relationship(
         "User", back_populates="payments", lazy="selectin",
     )
@@ -723,7 +643,6 @@ class GiftCard(Base):
 
     redeemed_by: Mapped[Optional[int]] = mapped_column(
         BigInteger, nullable=True,
-        comment="Telegram ID de quem resgatou",
     )
     redeemed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True,
@@ -734,11 +653,10 @@ class GiftCard(Base):
     )
     batch_id: Mapped[Optional[str]] = mapped_column(
         String(50), nullable=True, index=True,
-        comment="ID do lote (pra gerar em massa)",
     )
 
     created_by: Mapped[Optional[int]] = mapped_column(
-        BigInteger, nullable=True, comment="Admin que criou",
+        BigInteger, nullable=True,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False,
@@ -746,7 +664,7 @@ class GiftCard(Base):
 
 
 # ============================================
-# 🤝 AFFILIATES — Comissões de afiliado
+# 🤝 AFFILIATE COMMISSIONS
 # ============================================
 
 class AffiliateCommission(Base):
@@ -768,15 +686,12 @@ class AffiliateCommission(Base):
 
     base_amount: Mapped[Decimal] = mapped_column(
         Numeric(10, 2), nullable=False,
-        comment="Valor que o indicado recarregou",
     )
     percentage: Mapped[Decimal] = mapped_column(
         Numeric(5, 2), nullable=False,
-        comment="Percentual aplicado",
     )
     commission: Mapped[Decimal] = mapped_column(
         Numeric(10, 2), nullable=False,
-        comment="Comissão gerada",
     )
 
     created_at: Mapped[datetime] = mapped_column(
@@ -812,18 +727,14 @@ class Withdrawal(Base):
         default=WithdrawalStatus.PENDING, nullable=False, index=True,
     )
 
-    # Dados do destino
     pix_key: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     pix_key_type: Mapped[Optional[str]] = mapped_column(
         String(20), nullable=True,
-        comment="cpf, cnpj, email, phone, random",
     )
     bank_data: Mapped[Optional[dict]] = mapped_column(
         JSONB, nullable=True,
-        comment="Dados bancários (banco, agência, conta, titular)",
     )
 
-    # Processamento
     approved_by: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     processed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True,
@@ -858,7 +769,7 @@ class BankAccount(Base):
     agency: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     account: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     account_type: Mapped[Optional[str]] = mapped_column(
-        String(20), nullable=True, comment="corrente, poupanca",
+        String(20), nullable=True,
     )
     holder_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     holder_document: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
@@ -871,7 +782,7 @@ class BankAccount(Base):
 
 
 # ============================================
-# 🔔 ALERTS — Alertas de estoque (usuário assina)
+# 🔔 STOCK ALERTS — Alertas de estoque
 # ============================================
 
 class StockAlert(Base):
@@ -913,16 +824,14 @@ class Broadcast(Base):
     message_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     media_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     media_type: Mapped[Optional[str]] = mapped_column(
-        String(20), nullable=True, comment="photo, video, document, none",
+        String(20), nullable=True,
     )
     buttons: Mapped[Optional[list]] = mapped_column(
         JSONB, nullable=True,
-        comment="Lista de botões inline",
     )
 
     target_audience: Mapped[str] = mapped_column(
         String(50), default="all", nullable=False,
-        comment="all, active, inactive, buyers, affiliates, product_X",
     )
 
     status: Mapped[BroadcastStatus] = mapped_column(
@@ -935,10 +844,9 @@ class Broadcast(Base):
     )
     is_recurring: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     recurrence_rule: Mapped[Optional[str]] = mapped_column(
-        String(100), nullable=True, comment="Ex: daily, weekly, cron",
+        String(100), nullable=True,
     )
 
-    # Estatísticas de envio
     total_targets: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     sent_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     failed_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -975,7 +883,6 @@ class Ticket(Base):
         default=TicketStatus.OPEN, nullable=False, index=True,
     )
 
-    # Histórico de mensagens (JSON)
     messages: Mapped[list] = mapped_column(JSONB, default=list, nullable=False)
 
     opened_at: Mapped[datetime] = mapped_column(
@@ -987,11 +894,7 @@ class Ticket(Base):
 
 
 # ============================================
-# 📝 MESSAGE TEMPLATES — Mensagens editáveis pelo admin
-# ============================================
-# Aqui ficam TODAS as mensagens que o bot envia.
-# O admin edita, e o bot lê em tempo real.
-# Suporta variáveis como {BALANCE}, {PRODUCT_NAME} etc.
+# 📝 MESSAGE TEMPLATES — Mensagens editáveis
 # ============================================
 
 class MessageTemplate(Base):
@@ -1002,26 +905,21 @@ class MessageTemplate(Base):
 
     key: Mapped[str] = mapped_column(
         String(100), unique=True, index=True, nullable=False,
-        comment="Chave da mensagem (ex: start, catalogo, perfil)",
     )
     category: Mapped[str] = mapped_column(
         String(50), index=True, nullable=False,
-        comment="Categoria: start, compra, pix, perfil, etc",
     )
     title: Mapped[Optional[str]] = mapped_column(
-        String(200), nullable=True, comment="Nome amigável pro admin",
+        String(200), nullable=True,
     )
     text: Mapped[str] = mapped_column(
         Text, nullable=False,
-        comment="Texto com variáveis {USER_ID}, {BALANCE} etc",
     )
     parse_mode: Mapped[str] = mapped_column(
         String(20), default="HTML", nullable=False,
-        comment="HTML, Markdown, MarkdownV2",
     )
     image_url: Mapped[Optional[str]] = mapped_column(
         String(500), nullable=True,
-        comment="Imagem anexada (opcional)",
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
@@ -1037,9 +935,6 @@ class MessageTemplate(Base):
 # ============================================
 # 🔘 BUTTON TEMPLATES — Botões editáveis
 # ============================================
-# Cada linha é um botão. O admin edita texto,
-# ação, URL, posição, status.
-# ============================================
 
 class ButtonTemplate(Base):
     """Botão editável pelo painel administrativo."""
@@ -1049,31 +944,25 @@ class ButtonTemplate(Base):
 
     key: Mapped[str] = mapped_column(
         String(100), index=True, nullable=False,
-        comment="Identificador do botão (ex: btn_comprar)",
     )
     menu: Mapped[str] = mapped_column(
         String(50), index=True, nullable=False,
-        comment="Em qual menu aparece (start, catalogo, perfil, etc)",
     )
     text: Mapped[str] = mapped_column(
         String(100), nullable=False,
-        comment="Texto do botão (com emoji)",
     )
     action_type: Mapped[str] = mapped_column(
         String(20), default="callback", nullable=False,
-        comment="callback, url, webapp",
     )
     action_data: Mapped[Optional[str]] = mapped_column(
         String(500), nullable=True,
-        comment="Callback data, URL ou URL do WebApp",
     )
 
-    # Posição
     row: Mapped[int] = mapped_column(
-        Integer, default=0, nullable=False, comment="Linha do teclado",
+        Integer, default=0, nullable=False,
     )
     position: Mapped[int] = mapped_column(
-        Integer, default=0, nullable=False, comment="Coluna na linha",
+        Integer, default=0, nullable=False,
     )
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -1095,19 +984,129 @@ class ImageTemplate(Base):
 
     key: Mapped[str] = mapped_column(
         String(100), unique=True, index=True, nullable=False,
-        comment="Identificador (ex: start_image, pix_image)",
     )
     title: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     image_url: Mapped[str] = mapped_column(String(500), nullable=False)
     telegram_file_id: Mapped[Optional[str]] = mapped_column(
         String(200), nullable=True,
-        comment="File ID do Telegram (evita re-upload)",
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(),
         onupdate=func.now(), nullable=False,
+    )
+
+
+# ============================================
+# 📧 VERIFICATION CODE — Códigos de verificação
+# ============================================
+# Códigos usados para:
+#   - Verificação de e-mail
+#   - Recuperação de senha de saque
+#   - Entrega de produto por e-mail
+#   - Confirmação de identidade
+#   - Confirmação de saque
+#
+# PERSISTENTE no banco (sobrevive a restarts).
+# ============================================
+
+class VerificationCode(Base):
+    """Código de verificação por e-mail (persistente)."""
+    __tablename__ = "verification_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    telegram_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, nullable=True, index=True,
+        comment="ID do Telegram do usuário (se aplicável)",
+    )
+    email: Mapped[str] = mapped_column(
+        String(200), nullable=False, index=True,
+        comment="E-mail que vai receber o código",
+    )
+
+    code: Mapped[str] = mapped_column(
+        String(10), nullable=False,
+        comment="Código de 6 dígitos",
+    )
+    type: Mapped[VerificationCodeType] = mapped_column(
+        SAEnum(VerificationCodeType, name="verification_code_type"),
+        nullable=False, index=True,
+    )
+
+    attempts: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False,
+        comment="Tentativas já feitas",
+    )
+    max_attempts: Mapped[int] = mapped_column(
+        Integer, default=5, nullable=False,
+        comment="Máximo de tentativas permitidas",
+    )
+    used: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False,
+        comment="Código já foi usado?",
+    )
+
+    extra_data: Mapped[dict] = mapped_column(
+        JSONB, default=dict, nullable=False,
+        comment="Dados extras (order_id, amount, etc)",
+    )
+
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True,
+    )
+    used_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False,
+        index=True,
+    )
+
+
+# ============================================
+# 📧 NOTIFICATION LOG — Histórico de envios
+# ============================================
+# Registra todo e-mail/WhatsApp/Telegram enviado
+# (auditoria + retry + estatísticas).
+# ============================================
+
+class NotificationLog(Base):
+    """Log de notificações enviadas (e-mail, WhatsApp, Telegram)."""
+    __tablename__ = "notification_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    channel: Mapped[str] = mapped_column(
+        String(20), nullable=False, index=True,
+        comment="Canal: email, whatsapp, telegram",
+    )
+    recipient: Mapped[str] = mapped_column(
+        String(200), nullable=False, index=True,
+        comment="Destinatário (email, telefone, telegram_id)",
+    )
+    subject: Mapped[Optional[str]] = mapped_column(
+        String(200), nullable=True,
+    )
+    template: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True,
+        comment="Nome do template usado",
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), default="sent", nullable=False, index=True,
+        comment="sent, failed, bounced",
+    )
+    error_message: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True,
+    )
+    telegram_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, nullable=True, index=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False,
+        index=True,
     )
 
 
@@ -1126,10 +1125,9 @@ class AuditLog(Base):
     )
     action: Mapped[str] = mapped_column(
         String(100), nullable=False, index=True,
-        comment="Ex: add_balance, remove_product, block_user",
     )
     target_type: Mapped[Optional[str]] = mapped_column(
-        String(50), nullable=True, comment="user, product, payment, etc",
+        String(50), nullable=True,
     )
     target_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
@@ -1197,9 +1195,6 @@ class BlockedUser(Base):
 # ============================================
 # 📊 DAILY STATS — Estatísticas diárias (cache)
 # ============================================
-# Guarda totais por dia pra dashboard rápido.
-# Um cron diário atualiza isso.
-# ============================================
 
 class DailyStats(Base):
     """Estatísticas agregadas por dia (pra dashboard)."""
@@ -1244,10 +1239,6 @@ Index("ix_users_status_created", User.status, User.created_at)
 Index("ix_orders_status_created", Order.status, Order.created_at)
 Index("ix_payments_status_expires", Payment.status, Payment.expires_at)
 Index("ix_stock_product_status", StockItem.product_id, StockItem.status)
-
-# ============================================
-# FIM — próximos arquivos:
-#   - Alembic (criar tabelas)
-#   - Bot base (main.py)
-#   - Handlers /start, /admin
-# ============================================
+Index("ix_verification_email_type", VerificationCode.email, VerificationCode.type)
+Index("ix_verification_expires", VerificationCode.expires_at, VerificationCode.used)
+Index("ix_notification_channel_status", NotificationLog.channel, NotificationLog.status)

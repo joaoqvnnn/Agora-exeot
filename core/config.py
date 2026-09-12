@@ -9,6 +9,11 @@
 #
 # Se alguma variável obrigatória estiver faltando,
 # o sistema avisa NA HORA em vez de quebrar depois.
+#
+# ✨ ATUALIZADO:
+#   - Adiciona WhatsApp (Baileys)
+#   - Adiciona Activation URL
+#   - Adiciona WA Flow settings
 # ============================================
 
 from functools import lru_cache
@@ -102,11 +107,24 @@ class Settings(BaseSettings):
     openai_temperature: float = 0.7
 
     # --------------------------------------------
-    # 📱 WHATSAPP (não oficial)
+    # 📱 WHATSAPP (Baileys — serviço Node.js)
     # --------------------------------------------
-    whatsapp_api_url: Optional[str] = None
-    whatsapp_api_key: Optional[str] = None
-    whatsapp_phone_number: Optional[str] = None
+    whatsapp_api_url: Optional[str] = Field(
+        None,
+        description="URL do serviço Baileys (ex: https://larizinha-whatsapp.onrender.com)",
+    )
+    whatsapp_api_key: Optional[str] = Field(
+        None,
+        description="API key que o Baileys espera (X-Api-Key)",
+    )
+    whatsapp_phone_number: Optional[str] = Field(
+        None,
+        description="Número do WhatsApp (formato internacional: 5511999999999)",
+    )
+    whatsapp_webhook_secret: Optional[str] = Field(
+        None,
+        description="Secret usado pra validar webhooks do Baileys",
+    )
 
     # --------------------------------------------
     # 🔐 SEGURANÇA / SESSÃO
@@ -129,9 +147,42 @@ class Settings(BaseSettings):
     # --------------------------------------------
     # 🌐 URLS DO SISTEMA
     # --------------------------------------------
-    base_url: str = "https://seu-servico.onrender.com"
-    webapp_url: str = "https://seu-servico.onrender.com/webapp"
-    activation_url: str = "https://seu-servico.onrender.com/ativar"
+    base_url: str = Field(
+        "https://seu-servico.onrender.com",
+        description="URL base do sistema (sem barra no final)",
+    )
+    webapp_url: str = Field(
+        "https://seu-servico.onrender.com/webapp",
+        description="URL do Mini App (loja)",
+    )
+    activation_url: str = Field(
+        "https://seu-servico.onrender.com/webapp/activate",
+        description="URL do site de ativação por e-mail",
+    )
+
+    # --------------------------------------------
+    # 📲 WHATSAPP FLOW (ativação via link)
+    # --------------------------------------------
+    wa_flow_require_password: bool = Field(
+        True,
+        description="Exigir senha de saque pra ativar via WhatsApp",
+    )
+    wa_flow_show_link_direct: bool = Field(
+        True,
+        description="Enviar link direto no WhatsApp (ou só avisar)",
+    )
+    wa_flow_link_days: int = Field(
+        30,
+        description="Dias que o link de ativação do WhatsApp fica válido",
+    )
+    wa_flow_max_attempts: int = Field(
+        5,
+        description="Tentativas de senha na ativação via WhatsApp",
+    )
+    wa_flow_lockout_minutes: int = Field(
+        30,
+        description="Minutos de bloqueio após exceder tentativas",
+    )
 
     # --------------------------------------------
     # 📊 LOGS / SUPORTE
@@ -182,6 +233,23 @@ class Settings(BaseSettings):
             raise ValueError("OPENAI_TEMPERATURE deve estar entre 0 e 2.")
         return v
 
+    @field_validator("base_url", "webapp_url", "activation_url", "whatsapp_api_url")
+    @classmethod
+    def validate_url(cls, v: Optional[str]) -> Optional[str]:
+        """Garante que URLs terminam sem barra."""
+        if v and isinstance(v, str) and v.endswith("/"):
+            return v[:-1]
+        return v
+
+    @field_validator("whatsapp_phone_number")
+    @classmethod
+    def validate_whatsapp_phone(cls, v: Optional[str]) -> Optional[str]:
+        """Remove tudo que não é dígito do número do WhatsApp."""
+        if not v:
+            return None
+        import re
+        return re.sub(r"\D", "", v)
+
     # --------------------------------------------
     # 🧠 PROPRIEDADES ÚTEIS
     # --------------------------------------------
@@ -229,6 +297,45 @@ class Settings(BaseSettings):
         base = self.telegram_admin_webhook_url.rstrip("/")
         return f"{base}/webhook/telegram-admin/{self.telegram_admin_webhook_secret}"
 
+    @property
+    def whatsapp_api_url_clean(self) -> Optional[str]:
+        """URL do Baileys sem barra final."""
+        if not self.whatsapp_api_url:
+            return None
+        return self.whatsapp_api_url.rstrip("/")
+
+    @property
+    def wa_flow_enabled(self) -> bool:
+        """Verifica se o WhatsApp Flow está configurado."""
+        return bool(self.whatsapp_api_url and self.whatsapp_api_key)
+
+    @property
+    def has_whatsapp(self) -> bool:
+        """Verifica se o WhatsApp está configurado."""
+        return bool(self.whatsapp_api_url)
+
+    @property
+    def has_email(self) -> bool:
+        """Verifica se o SMTP está configurado."""
+        return bool(self.smtp_user and self.smtp_password)
+
+    @property
+    def has_openai(self) -> bool:
+        """Verifica se a OpenAI está configurada."""
+        return bool(self.openai_api_key)
+
+    @property
+    def has_mercadopago(self) -> bool:
+        """Verifica se o Mercado Pago está configurado."""
+        return bool(self.mercadopago_access_token)
+
+    @property
+    def qr_url(self) -> Optional[str]:
+        """URL pública da página do QR Code do WhatsApp."""
+        if not self.whatsapp_api_url:
+            return None
+        return f"{self.whatsapp_api_url_clean}/qr"
+
 
 # ============================================
 # 🔁 SINGLETON — instância única de settings
@@ -251,13 +358,24 @@ settings = get_settings()
 # 🧪 TESTE RÁPIDO (só roda se executar este arquivo direto)
 # ============================================
 if __name__ == "__main__":
-    from rich import print as rprint  # opcional
-
-    rprint("[bold green]✅ Configurações carregadas:[/bold green]")
-    rprint(f"Ambiente: {settings.environment}")
-    rprint(f"Produção? {settings.is_production}")
-    rprint(f"Webhook bot: {settings.telegram_webhook_full_url}")
-    rprint(f"Banco (async): {settings.database_url_async[:60]}...")
+    print("✅ Configurações carregadas:")
+    print(f"Ambiente: {settings.environment}")
+    print(f"Produção? {settings.is_production}")
+    print(f"Webhook bot: {settings.telegram_webhook_full_url}")
+    print(f"Banco (async): {settings.database_url_async[:60]}...")
+    print(f"")
+    print(f"📊 Integrações:")
+    print(f"├ WhatsApp: {'🟢' if settings.has_whatsapp else '🔴'}")
+    print(f"├ E-mail:   {'🟢' if settings.has_email else '🔴'}")
+    print(f"├ OpenAI:   {'🟢' if settings.has_openai else '🔴'}")
+    print(f"├ Mercado Pago: {'🟢' if settings.has_mercadopago else '🔴'}")
+    print(f"└ WA Flow:  {'🟢' if settings.wa_flow_enabled else '🔴'}")
+    print(f"")
+    print(f"🌐 URLs:")
+    print(f"├ Base:       {settings.base_url}")
+    print(f"├ WebApp:     {settings.webapp_url}")
+    print(f"├ Ativação:   {settings.activation_url}")
+    print(f"└ QR:         {settings.qr_url or '—'}")
 
 # ============================================
 # FIM

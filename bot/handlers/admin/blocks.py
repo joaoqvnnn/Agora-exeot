@@ -10,6 +10,12 @@
 #   - DESBLOQUEAR
 #   - ALTERAR duração
 #   - VER detalhes do bloqueio
+#   - LIMPAR expirados
+#
+# ✨ CORRIGIDO:
+#   - Aceita `adm_block:list` (sem página) E `adm_block:list:N`
+#   - Bug do botão "Bloqueios" em Config Gerais corrigido
+#   - Adicionado handler para `adm_block:list` puro
 # ============================================
 
 from datetime import datetime, timedelta, timezone
@@ -22,6 +28,7 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     Message,
 )
+from loguru import logger
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -84,6 +91,20 @@ def _format_dt(dt: datetime | None) -> str:
     return dt.strftime("%d/%m/%Y %H:%M")
 
 
+def _format_duration(seconds: int) -> str:
+    """Formata duração em texto legível."""
+    if seconds <= 0:
+        return "Permanente"
+
+    if seconds < 60:
+        return f"{seconds}s"
+    if seconds < 3600:
+        return f"{seconds // 60}min"
+    if seconds < 86400:
+        return f"{seconds // 3600}h"
+    return f"{seconds // 86400}d"
+
+
 # ============================================
 # 📋 MENU PRINCIPAL
 # ============================================
@@ -105,21 +126,36 @@ async def cb_blocks_menu(
         )
     ) or 0
 
+    expired = total - active
+
     text = (
         "🚫 <b>BLOQUEIOS DE USUÁRIOS</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n\n"
         f"📊 Total histórico: <b>{total}</b>\n"
-        f"🔴 Bloqueados agora: <b>{active}</b>\n\n"
+        f"🔴 Bloqueados agora: <b>{active}</b>\n"
+        f"⚪ Expirados: <b>{expired}</b>\n\n"
         "Bloqueios impedem o usuário de usar o bot.\n\n"
         "Escolha uma opção:"
     )
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="📋 Lista de Bloqueados", callback_data="adm_block:list:0")],
-            [InlineKeyboardButton(text="➕ Bloquear Usuário", callback_data="adm_block:add")],
-            [InlineKeyboardButton(text="➖ Desbloquear Usuário", callback_data="adm_block:remove")],
-            [InlineKeyboardButton(text="🧹 Limpar Expirados", callback_data="adm_block:clean_expired")],
+            [InlineKeyboardButton(
+                text=f"📋 Lista de Bloqueados ({active})",
+                callback_data="adm_block:list:0",
+            )],
+            [InlineKeyboardButton(
+                text="➕ Bloquear Usuário",
+                callback_data="adm_block:add",
+            )],
+            [InlineKeyboardButton(
+                text="➖ Desbloquear Usuário",
+                callback_data="adm_block:remove",
+            )],
+            [InlineKeyboardButton(
+                text="🧹 Limpar Expirados",
+                callback_data="adm_block:clean_expired",
+            )],
             [InlineKeyboardButton(text="🔙 Voltar", callback_data="adm:config")],
         ]
     )
@@ -133,7 +169,29 @@ async def cb_blocks_menu(
 
 
 # ============================================
-# 📋 LISTA DE BLOQUEADOS
+# 🆕 HANDLER: adm_block:list (SEM PÁGINA)
+# ============================================
+# ⚠️ CORREÇÃO: o botão em "Config Gerais" chama
+# `adm_block:list` (sem número). Este handler
+# redireciona pra página 0.
+# ============================================
+@router.callback_query(F.data == "adm_block:list")
+async def cb_blocks_list_no_page(
+    callback: CallbackQuery,
+    session: AsyncSession,
+) -> None:
+    """Redireciona pra lista com página 0."""
+    if not await _is_admin(session, callback.from_user.id):
+        await callback.answer("🚫 Sem acesso.", show_alert=True)
+        return
+
+    # Redireciona pro handler com página
+    callback.data = "adm_block:list:0"
+    await cb_blocks_list(callback, session)
+
+
+# ============================================
+# 📋 LISTA DE BLOQUEADOS (com página)
 # ============================================
 @router.callback_query(F.data.startswith("adm_block:list:"))
 async def cb_blocks_list(
@@ -177,7 +235,6 @@ async def cb_blocks_list(
     else:
         now = datetime.now(timezone.utc)
         for b in blocks:
-            blocked_at = _format_dt(b.blocked_at)
             if b.expires_at is None:
                 exp = "Permanente"
                 status_emoji = "🔴"
@@ -252,7 +309,12 @@ async def cb_blocks_view(
         await callback.answer("🚫 Sem acesso.", show_alert=True)
         return
 
-    block_id = int(callback.data.split(":")[2])
+    try:
+        block_id = int(callback.data.split(":")[2])
+    except (ValueError, IndexError):
+        await callback.answer("❌ ID inválido.", show_alert=True)
+        return
+
     block = await session.get(BlockedUser, block_id)
     if block is None:
         await callback.answer("❌ Bloqueio não encontrado.", show_alert=True)
@@ -271,7 +333,8 @@ async def cb_blocks_view(
     elif block.expires_at > now:
         remaining = block.expires_at - now
         hours = int(remaining.total_seconds() // 3600)
-        status = f"🔴 Ativo (expira em {hours}h)"
+        mins = int((remaining.total_seconds() % 3600) // 60)
+        status = f"🔴 Ativo (expira em {hours}h {mins}min)"
     else:
         status = "⚪ Expirado"
 
@@ -368,6 +431,13 @@ async def msg_blocks_user_id(
         return
 
     raw = (message.text or "").strip()
+
+    # Cancelar
+    if raw.startswith("/cancelar") or raw.startswith("/start"):
+        await state.clear()
+        await message.answer("❌ Operação cancelada.")
+        return
+
     if not raw.isdigit():
         await message.answer("❌ ID inválido. Envie apenas números.")
         return
@@ -395,12 +465,13 @@ async def msg_blocks_user_id(
         select(User).where(User.telegram_id == target_id)
     )
 
-    user_info = "❓ Não registrado no bot"
     if user:
         user_info = (
             f"👤 {user.first_name or 'Sem nome'}\n"
-            f"📛 @{user.username}" if user.username else "📛 —"
+            f"📛 {('@' + user.username) if user.username else '—'}"
         )
+    else:
+        user_info = "❓ Não registrado no bot"
 
     await state.update_data(target_id=target_id)
 
@@ -424,9 +495,15 @@ async def msg_blocks_reason(
     if not await _is_admin(session, message.from_user.id):
         return
 
-    reason = (message.text or "").strip()
-    if reason == "-":
-        reason = ""
+    raw = (message.text or "").strip()
+
+    # Cancelar
+    if raw.startswith("/cancelar") or raw.startswith("/start"):
+        await state.clear()
+        await message.answer("❌ Operação cancelada.")
+        return
+
+    reason = raw if raw != "-" else ""
 
     await state.update_data(reason=reason)
 
@@ -436,6 +513,7 @@ async def msg_blocks_reason(
             [InlineKeyboardButton(text="🕐 1 hora", callback_data="adm_block:setdur:3600")],
             [InlineKeyboardButton(text="📅 24 horas", callback_data="adm_block:setdur:86400")],
             [InlineKeyboardButton(text="📆 7 dias", callback_data="adm_block:setdur:604800")],
+            [InlineKeyboardButton(text="📅 30 dias", callback_data="adm_block:setdur:2592000")],
             [InlineKeyboardButton(text="🔴 Permanente", callback_data="adm_block:setdur:0")],
             [InlineKeyboardButton(text="❌ Cancelar", callback_data="adm_block:menu")],
         ]
@@ -485,12 +563,14 @@ async def cb_blocks_setdur(
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=duration)
 
     if existing:
+        # Atualiza
         existing.reason = reason
         existing.expires_at = expires_at
         existing.blocked_by = callback.from_user.id
         existing.blocked_at = datetime.now(timezone.utc)
         session.add(existing)
     else:
+        # Cria novo
         block = BlockedUser(
             user_telegram_id=target_id,
             reason=reason,
@@ -516,7 +596,7 @@ async def cb_blocks_setdur(
         new_value={"reason": reason, "duration": duration},
     )
 
-    duration_txt = "Permanente" if duration == 0 else f"{duration // 60}min"
+    duration_txt = _format_duration(duration)
 
     await callback.answer(f"🔴 Bloqueado por {duration_txt}!", show_alert=True)
 
@@ -536,6 +616,7 @@ async def cb_blocks_setdur(
 
     await state.clear()
 
+    # Volta pro menu
     callback.data = "adm_block:menu"
     await cb_blocks_menu(callback, session)
 
@@ -552,7 +633,12 @@ async def cb_blocks_unblock(
         await callback.answer("🚫 Sem acesso.", show_alert=True)
         return
 
-    block_id = int(callback.data.split(":")[2])
+    try:
+        block_id = int(callback.data.split(":")[2])
+    except (ValueError, IndexError):
+        await callback.answer("❌ ID inválido.", show_alert=True)
+        return
+
     block = await session.get(BlockedUser, block_id)
     if block is None:
         await callback.answer("❌ Bloqueio não encontrado.", show_alert=True)
@@ -591,6 +677,7 @@ async def cb_blocks_unblock(
     except Exception:
         pass
 
+    # Volta pra lista
     callback.data = "adm_block:list:0"
     await cb_blocks_list(callback, session)
 
@@ -607,7 +694,11 @@ async def cb_blocks_change_dur(
         await callback.answer("🚫 Sem acesso.", show_alert=True)
         return
 
-    block_id = int(callback.data.split(":")[2])
+    try:
+        block_id = int(callback.data.split(":")[2])
+    except (ValueError, IndexError):
+        await callback.answer("❌ ID inválido.", show_alert=True)
+        return
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -615,6 +706,7 @@ async def cb_blocks_change_dur(
             [InlineKeyboardButton(text="🕐 1 hora", callback_data=f"adm_block:newdur:{block_id}:3600")],
             [InlineKeyboardButton(text="📅 24 horas", callback_data=f"adm_block:newdur:{block_id}:86400")],
             [InlineKeyboardButton(text="📆 7 dias", callback_data=f"adm_block:newdur:{block_id}:604800")],
+            [InlineKeyboardButton(text="📅 30 dias", callback_data=f"adm_block:newdur:{block_id}:2592000")],
             [InlineKeyboardButton(text="🔴 Permanente", callback_data=f"adm_block:newdur:{block_id}:0")],
             [InlineKeyboardButton(text="🔙 Voltar", callback_data=f"adm_block:view:{block_id}")],
         ]
@@ -637,13 +729,19 @@ async def cb_blocks_newdur(
         return
 
     parts = callback.data.split(":")
-    block_id = int(parts[2])
-    duration = int(parts[3])
+    try:
+        block_id = int(parts[2])
+        duration = int(parts[3])
+    except (ValueError, IndexError):
+        await callback.answer("❌ Valor inválido.", show_alert=True)
+        return
 
     block = await session.get(BlockedUser, block_id)
     if block is None:
         await callback.answer("❌ Bloqueio não encontrado.", show_alert=True)
         return
+
+    old_expires = block.expires_at
 
     if duration == 0:
         block.expires_at = None
@@ -658,7 +756,8 @@ async def cb_blocks_newdur(
         "change_block_duration",
         target_type="user",
         target_id=str(block.user_telegram_id),
-        new_value={"duration": duration},
+        old_value={"expires_at": old_expires.isoformat() if old_expires else None},
+        new_value={"expires_at": block.expires_at.isoformat() if block.expires_at else None},
     )
 
     await callback.answer("✅ Duração atualizada!", show_alert=True)
@@ -679,7 +778,12 @@ async def cb_blocks_delete(
         await callback.answer("🚫 Sem acesso.", show_alert=True)
         return
 
-    block_id = int(callback.data.split(":")[2])
+    try:
+        block_id = int(callback.data.split(":")[2])
+    except (ValueError, IndexError):
+        await callback.answer("❌ ID inválido.", show_alert=True)
+        return
+
     block = await session.get(BlockedUser, block_id)
     if block is None:
         await callback.answer("❌ Bloqueio não encontrado.", show_alert=True)
@@ -765,7 +869,10 @@ async def cb_blocks_clean_expired(
         new_value={"removed": len(expired)},
     )
 
-    await callback.answer(f"🧹 {len(expired)} expirados removidos!", show_alert=True)
+    await callback.answer(
+        f"🧹 {len(expired)} expirados removidos!",
+        show_alert=True,
+    )
 
     callback.data = "adm_block:menu"
     await cb_blocks_menu(callback, session)

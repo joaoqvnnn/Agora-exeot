@@ -3,8 +3,14 @@
 # ============================================
 # Perfil do cliente + histórico + gift card + alterar dados.
 # Mensagem única (edita, não acumula).
+#
+# ✨ ATUALIZADO:
+#   - Usa `email_verification` (persistente no banco)
+#   - Códigos sobrevivem a restart
+#   - Anti-spam integrado
 # ============================================
 
+import re
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -41,7 +47,9 @@ from core.models import (
     StockItem,
     StockStatus,
     User,
+    VerificationCodeType,
 )
+from core.services import email_verification
 from core.services.messages import render_message
 
 
@@ -115,6 +123,7 @@ async def _show_profile(
     ) or Decimal("0.00")
 
     whatsapp = user.whatsapp or "Não cadastrado"
+    email = user.email if user.email_verified else "Não cadastrado"
 
     text = (
         f"👤 <b>Meu perfil</b>\n\n"
@@ -122,7 +131,8 @@ async def _show_profile(
         f"- 👤 <b>Informações:</b>\n"
         f"🆔 ID da Carteira: <code>{user.telegram_id}</code>\n"
         f"💰 Saldo Atual: <b>R$ {_format_brl(user.balance)}</b>\n"
-        f"📲 Seu Whatsapp: {whatsapp}\n\n"
+        f"📲 Seu Whatsapp: {whatsapp}\n"
+        f"📧 Seu E-mail: {email}\n\n"
         f"─── 📊 <b>Suas Movimentações:</b>\n"
         f"ー 🛒 Compras Realizadas: <b>{purchases}</b>\n"
         f"ー 💰 Total Gasto Em Compras: <b>R$ {_format_brl(total_spent)}</b>\n"
@@ -207,7 +217,10 @@ async def _show_history(
 
     if not orders:
         if only_active:
-            text = "Você não tem compras ativas (não vencidas) no bot.\n\nUse o botão abaixo para ver todas as compras."
+            text = (
+                "Você não tem compras ativas (não vencidas) no bot.\n\n"
+                "Use o botão abaixo para ver todas as compras."
+            )
             keyboard = build_no_active_keyboard()
         else:
             text = (
@@ -217,15 +230,21 @@ async def _show_history(
             )
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="🛍 Comprar Produtos", callback_data="menu:comprar")],
-                    [InlineKeyboardButton(text="🔙 Voltar", callback_data="prof:voltar")],
+                    [InlineKeyboardButton(
+                        text="🛍 Comprar Produtos",
+                        callback_data="menu:comprar",
+                    )],
+                    [InlineKeyboardButton(
+                        text="🔙 Voltar",
+                        callback_data="prof:voltar",
+                    )],
                 ]
             )
         await _edit_or_send(callback, text, keyboard)
         return
 
-    # Paginação
-    PER_PAGE = 1  # mostra 1 por vez (padrão original)
+    # Paginação (1 por vez — padrão original)
+    PER_PAGE = 1
     total_pages = max(1, (total_orders + PER_PAGE - 1) // PER_PAGE)
     page = max(0, min(page, total_pages - 1))
 
@@ -265,12 +284,14 @@ async def _show_history(
 
         if len(items) > 1:
             text_lines.append("")
-            text_lines.append(f"<i>+{len(items) - 1} login(s) extra(s) nesta compra.</i>")
+            text_lines.append(
+                f"<i>+{len(items) - 1} login(s) extra(s) nesta compra.</i>"
+            )
 
     text = "\n".join(text_lines)
 
     # Verifica se está ativa
-    is_active = order.expires_at and order.expires_at > now
+    is_active = bool(order.expires_at and order.expires_at > now)
 
     keyboard = build_history_keyboard(
         current_page=page,
@@ -307,7 +328,7 @@ async def cb_order_detail(
     items = list(items_result.scalars().all())
 
     now = datetime.now(timezone.utc)
-    is_active = order.expires_at and order.expires_at > now
+    is_active = bool(order.expires_at and order.expires_at > now)
 
     text_lines = [
         f"📦 <b>Detalhes do Pedido</b>",
@@ -452,9 +473,7 @@ async def msg_gift_code(
     await state.clear()
 
     # Volta pro perfil
-    await message.answer(
-        "Use /start para voltar ao menu principal.",
-    )
+    await message.answer("Use /start para voltar ao menu principal.")
 
 
 @router.callback_query(F.data == "gift:cancelar")
@@ -477,15 +496,19 @@ async def cb_change_data(
     user: User,
     session: AsyncSession,
 ) -> None:
+    whatsapp = user.whatsapp or "Não cadastrado"
+    email = user.email if user.email_verified else "Não cadastrado"
+
     text = (
         f"✏️ <b>Alterar Dados</b>\n\n"
         f"Selecione o dado que deseja alterar:\n\n"
-        f"📱 WhatsApp: {user.whatsapp or 'Não cadastrado'}"
+        f"📱 WhatsApp: {whatsapp}\n"
+        f"📧 E-mail: {email}"
     )
 
     keyboard = build_change_data_keyboard(
         whatsapp=user.whatsapp,
-        email=user.email,
+        email=user.email if user.email_verified else None,
     )
 
     await _edit_or_send(callback, text, keyboard)
@@ -554,13 +577,11 @@ async def msg_save_whatsapp(
 
     await state.clear()
 
-    await message.answer(
-        f"✅ WhatsApp salvo: <code>{digits}</code>"
-    )
+    await message.answer(f"✅ WhatsApp salvo: <code>{digits}</code>")
 
 
 # ============================================
-# 📧 ALTERAR E-MAIL
+# 📧 ALTERAR E-MAIL (usando email_verification)
 # ============================================
 @router.callback_query(F.data == "prof:changing_email")
 async def cb_change_email(
@@ -590,8 +611,10 @@ async def msg_save_email(
     user: User,
     session: AsyncSession,
 ) -> None:
-    import re
-
+    """
+    Recebe o novo e-mail e envia o código de verificação.
+    Usa `email_verification.send_email_verification()` (persistente no banco).
+    """
     raw = (message.text or "").strip().lower()
 
     if raw.startswith("/cancelar") or raw.startswith("/start"):
@@ -599,44 +622,56 @@ async def msg_save_email(
         await message.answer("❌ Operação cancelada.")
         return
 
-    # Valida
+    # Valida formato básico
     if not re.match(r"^[^@\s]+@[^@\s]+\.[a-z]{2,}$", raw):
         await message.answer(
-            "❌ E-mail inválido. Tente novamente:\n"
+            "❌ <b>E-mail inválido.</b>\n\n"
+            "Envie um endereço de e-mail válido.\n"
             "Exemplo: <code>seuemail@gmail.com</code>"
         )
         return
 
-    # Guarda o e-mail no state pra confirmar depois
-    await state.update_data(new_email=raw)
-
-    # Envia código
-    from core.services import email as email_service
-
-    code = email_service.generate_verification_code()
-
-    await state.update_data(email_code=code)
-
-    result = await email_service.send_verification_code(
-        to_email=raw,
-        code=code,
-        purpose="Verificação de e-mail",
+    # Envia o código de verificação
+    result = await email_verification.send_email_verification(
+        session=session,
+        user=user,
+        new_email=raw,
     )
 
     if not result.get("success"):
-        await message.answer(
-            f"❌ <b>Erro ao enviar e-mail.</b>\n\n"
-            f"<code>{result.get('error', 'Erro desconhecido')}</code>"
-        )
+        error = result.get("error", "Erro desconhecido")
+        cooldown = result.get("cooldown_seconds")
+
+        if cooldown:
+            await message.answer(
+                f"⏰ <b>Aguarde {cooldown}s</b> antes de solicitar outro código."
+            )
+        else:
+            await message.answer(
+                f"❌ <b>Erro ao enviar o e-mail.</b>\n\n"
+                f"<code>{error}</code>"
+            )
         return
 
+    # Salva o e-mail no state pra confirmar depois
+    await state.update_data(new_email=raw)
+
+    expiration = result.get("expiration_minutes", 15)
+
     await message.answer(
-        f"📩 Enviamos um código para <b>{raw}</b>.\n\n"
-        f"Digite o código de 6 dígitos recebido:"
+        f"📩 <b>Enviamos um código para seu e-mail.</b>\n\n"
+        f"📧 E-mail: <b>{raw}</b>\n\n"
+        f"Digite o <b>código de 6 dígitos</b> que você recebeu:\n\n"
+        f"<i>O código expira em {expiration} minutos.</i>",
+        reply_markup=build_email_code_keyboard(),
     )
+
     await state.set_state(ProfileStates.waiting_email_code)
 
 
+# ============================================
+# 🔢 VALIDAR CÓDIGO DE E-MAIL
+# ============================================
 @router.message(ProfileStates.waiting_email_code)
 async def msg_verify_email_code(
     message: Message,
@@ -644,6 +679,9 @@ async def msg_verify_email_code(
     user: User,
     session: AsyncSession,
 ) -> None:
+    """
+    Valida o código usando `email_verification.verify_email_change()`.
+    """
     raw = (message.text or "").strip()
 
     if raw.startswith("/cancelar") or raw.startswith("/start"):
@@ -651,44 +689,65 @@ async def msg_verify_email_code(
         await message.answer("❌ Operação cancelada.")
         return
 
+    # Extrai só dígitos
+    code_typed = "".join(c for c in raw if c.isdigit())
+
+    if len(code_typed) != 6:
+        await message.answer(
+            "❌ <b>Código inválido.</b>\n"
+            "Envie os 6 dígitos recebidos no e-mail."
+        )
+        return
+
     data = await state.get_data()
-    expected = data.get("email_code")
     new_email = data.get("new_email")
 
-    if not expected or not new_email:
+    if not new_email:
         await message.answer("❌ Sessão expirada. Recomece em /start.")
         await state.clear()
         return
 
-    if raw != expected:
-        await message.answer("❌ Código incorreto. Tente novamente.")
+    # Valida o código
+    result = await email_verification.verify_email_change(
+        session=session,
+        user=user,
+        email=new_email,
+        code=code_typed,
+    )
+
+    if not result.get("success"):
+        error = result.get("error", "Código incorreto")
+        attempts = result.get("attempts_remaining")
+        locked = result.get("locked")
+        expired = result.get("expired")
+
+        if locked:
+            await message.answer(f"🚫 {error}")
+            await state.clear()
+            return
+
+        if expired:
+            await message.answer(
+                f"⏰ {error}\n\n"
+                f"Envie /start e refaça o processo."
+            )
+            await state.clear()
+            return
+
+        extra = ""
+        if attempts is not None:
+            extra = f"\n\nTentativas restantes: <b>{attempts}</b>"
+
+        await message.answer(f"❌ {error}{extra}")
         return
 
-    # Salva
-    user.email = new_email
-    user.email_verified = True
-    session.add(user)
-
+    # ✓ Sucesso
     await state.clear()
 
     await message.answer(
         f"✅ <b>E-mail verificado e salvo!</b>\n\n"
         f"📧 <code>{new_email}</code>"
     )
-
-
-# ============================================
-# ❌ CANCELAR ALTERAÇÃO
-# ============================================
-@router.callback_query(F.data == "prof:cancelar")
-async def cb_cancel_change(
-    callback: CallbackQuery,
-    state: FSMContext,
-    user: User,
-    session: AsyncSession,
-) -> None:
-    await state.clear()
-    await cb_profile(callback, user, session)
 
 
 # ============================================
@@ -708,21 +767,40 @@ async def cb_resend_code(
         await callback.answer("❌ Sessão expirada.", show_alert=True)
         return
 
-    from core.services import email as email_service
-
-    code = email_service.generate_verification_code()
-    await state.update_data(email_code=code)
-
-    result = await email_service.send_verification_code(
-        to_email=new_email,
-        code=code,
-        purpose="Verificação de e-mail",
+    # Reenvia usando email_verification
+    result = await email_verification.send_email_verification(
+        session=session,
+        user=user,
+        new_email=new_email,
     )
 
-    if result.get("success"):
-        await callback.answer("📩 Código reenviado!", show_alert=True)
-    else:
-        await callback.answer("❌ Erro ao reenviar.", show_alert=True)
+    if not result.get("success"):
+        error = result.get("error", "Erro")
+        cooldown = result.get("cooldown_seconds")
+
+        if cooldown:
+            await callback.answer(
+                f"⏰ Aguarde {cooldown}s", show_alert=True
+            )
+        else:
+            await callback.answer(f"❌ {error}", show_alert=True)
+        return
+
+    await callback.answer("📩 Novo código enviado!", show_alert=True)
+
+
+# ============================================
+# ❌ CANCELAR ALTERAÇÃO
+# ============================================
+@router.callback_query(F.data == "prof:cancelar")
+async def cb_cancel_change(
+    callback: CallbackQuery,
+    state: FSMContext,
+    user: User,
+    session: AsyncSession,
+) -> None:
+    await state.clear()
+    await cb_profile(callback, user, session)
 
 
 # ============================================

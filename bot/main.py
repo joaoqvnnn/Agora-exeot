@@ -1,13 +1,14 @@
 # ============================================
-# 🚀 MAIN — Larizinha Store
+# 🚀 MAIN — Larizinha Store (COMPLETO)
 # ============================================
 # Arquivo principal que sobe TUDO:
 #   - FastAPI (webhook Telegram + webhooks externos)
+#   - Rotas da API (webapp, activation, static)
 #   - Bot do Telegram (via webhook)
 #   - APScheduler (tarefas agendadas)
 #   - Startup / Shutdown
 #
-# ⚠️ Este é o arquivo que o Render vai executar.
+# ⚠️ Este é o arquivo que o Render executa.
 # ============================================
 
 import asyncio
@@ -19,12 +20,17 @@ import uvicorn
 from aiogram.types import BotCommand, Update
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
 # ============================================
 # 📥 IMPORTAÇÕES DO PROJETO
 # ============================================
 from api.webhooks.mercadopago import router as mercadopago_router
+from api.routes.static import router as static_router
+from api.routes.webapp import router as webapp_router
+from api.routes.activation import router as activation_router
+
 from bot.loader import bot, dp, close_bots
 from bot.handlers import register_all_handlers
 from core.config import settings
@@ -55,6 +61,7 @@ async def lifespan(app: FastAPI):
     """
     Executado ANTES e DEPOIS do servidor subir.
     """
+
     # ========================================
     # 🟢 STARTUP
     # ========================================
@@ -132,19 +139,47 @@ app = FastAPI(
     description="Bot + Webhooks + Mini App backend",
     version="4.1.0",
     lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 
 # ============================================
-# 📥 REGISTRA ROUTERS
+# 🌍 CORS (permite o WebApp acessar a API)
 # ============================================
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://web.telegram.org",
+        "https://telegram.org",
+        "*",  # Telegram WebApp roda em iframe
+    ],
+    allow_credentials=False,  # Não usamos cookies
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
+
+# ============================================
+# 📥 REGISTRA TODOS OS ROUTERS
+# ============================================
+
+# Webhooks externos
 app.include_router(mercadopago_router)
+
+# Rotas da API
+app.include_router(webapp_router)
+app.include_router(activation_router)
+
+# Arquivos estáticos do WebApp (por último)
+app.include_router(static_router)
 
 
 # ============================================
 # 🏥 HEALTHCHECK (Render usa pra saber se está vivo)
 # ============================================
-@app.get("/")
+@app.get("/", tags=["health"])
 async def root():
     return {
         "status": "online",
@@ -154,7 +189,7 @@ async def root():
     }
 
 
-@app.get("/health")
+@app.get("/health", tags=["health"])
 async def health():
     """Endpoint de healthcheck do Render."""
     from core.database import check_database_connection
@@ -164,6 +199,7 @@ async def health():
     return {
         "status": "healthy" if db_ok else "degraded",
         "database": "ok" if db_ok else "down",
+        "webapp": "ok",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -171,7 +207,10 @@ async def health():
 # ============================================
 # 🤖 WEBHOOK DO TELEGRAM
 # ============================================
-@app.post(f"/webhook/telegram/{settings.telegram_webhook_secret}")
+@app.post(
+    f"/webhook/telegram/{settings.telegram_webhook_secret}",
+    include_in_schema=False,
+)
 async def telegram_webhook(request: Request) -> Response:
     """
     Recebe updates do Telegram via webhook.
@@ -180,7 +219,7 @@ async def telegram_webhook(request: Request) -> Response:
         update_data = await request.json()
         update = Update.model_validate(update_data, context={"bot": bot})
 
-        # Processa em background
+        # Processa em background (não bloqueia o webhook)
         asyncio.create_task(dp.feed_update(bot, update))
 
         return Response(status_code=200)
@@ -264,14 +303,20 @@ async def setup_bot_commands() -> None:
 def setup_scheduler() -> None:
     """
     Configura todos os jobs automáticos:
-      - Reservas expiradas       (1 min)
-      - Pagamentos expirados     (1 min)
-      - Broadcasts agendados     (1 min)
-      - Abandono de produto      (5 min)
-      - Carrinhos abandonados    (10 min)
-      - Estoque baixo            (10 min)
-      - Produtos expirados       (1 hora)
-      - Limpar logs antigos      (diário, 3h)
+
+      ─── Rápidos (1 min) ───
+      • Reservas expiradas
+      • Pagamentos expirados
+      • Broadcasts agendados
+
+      ─── Médios (5-10 min) ───
+      • Abandono de produto
+      • Carrinhos abandonados (WebApp)
+      • Estoque baixo
+
+      ─── Lentos (1h+) ───
+      • Produtos expirados
+      • Limpar logs antigos (diário)
     """
 
     # ─── Reservas expiradas (1 min) ───
@@ -282,6 +327,7 @@ def setup_scheduler() -> None:
         id="expire_reservations",
         replace_existing=True,
         misfire_grace_time=30,
+        max_instances=1,
     )
 
     # ─── Pagamentos expirados (1 min) ───
@@ -293,6 +339,7 @@ def setup_scheduler() -> None:
         args=[bot],
         replace_existing=True,
         misfire_grace_time=30,
+        max_instances=1,
     )
 
     # ─── Broadcasts agendados (1 min) ───
@@ -304,6 +351,7 @@ def setup_scheduler() -> None:
         args=[bot],
         replace_existing=True,
         misfire_grace_time=30,
+        max_instances=1,
     )
 
     # ─── Abandono de produto (5 min) ───
@@ -315,6 +363,7 @@ def setup_scheduler() -> None:
         args=[bot],
         replace_existing=True,
         misfire_grace_time=60,
+        max_instances=1,
     )
 
     # ─── Carrinhos abandonados (10 min) ───
@@ -326,6 +375,7 @@ def setup_scheduler() -> None:
         args=[bot],
         replace_existing=True,
         misfire_grace_time=120,
+        max_instances=1,
     )
 
     # ─── Estoque baixo (10 min) ───
@@ -337,6 +387,7 @@ def setup_scheduler() -> None:
         args=[bot],
         replace_existing=True,
         misfire_grace_time=120,
+        max_instances=1,
     )
 
     # ─── Produtos expirados (1 hora) ───
@@ -347,6 +398,7 @@ def setup_scheduler() -> None:
         id="expire_products",
         replace_existing=True,
         misfire_grace_time=300,
+        max_instances=1,
     )
 
     # ─── Limpar logs antigos (diário às 3h) ───
@@ -357,6 +409,7 @@ def setup_scheduler() -> None:
         minute=0,
         id="clean_logs",
         replace_existing=True,
+        max_instances=1,
     )
 
     logger.info("📅 Jobs agendados:")
@@ -399,7 +452,7 @@ async def notify_bot_online() -> None:
 
 
 # ============================================
-# 📌 REGISTRA HANDLERS
+# 📌 REGISTRA HANDLERS DO BOT
 # ============================================
 try:
     register_all_handlers(dp)

@@ -1,0 +1,1472 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0a0a0f" id="theme-color-meta">
+    <meta name="description" content="Ativar produto - Larizinha Store">
+    <meta name="robots" content="noindex, nofollow">
+
+    <title>Ativar Produto · Larizinha Store</title>
+
+    <!-- Fontes -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <style>
+        /* ============================================
+           🎨 DESIGN SYSTEM
+           ============================================ */
+        :root {
+            --color-primary: #7c5cff;
+            --color-primary-light: #a78bfa;
+            --color-primary-dark: #4f46e5;
+            --color-accent: #4f46e5;
+            --color-success: #10b981;
+            --color-warning: #f59e0b;
+            --color-danger: #ef4444;
+
+            --bg-base: #0a0a0f;
+            --bg-surface: #14141c;
+            --bg-elevated: #1c1c28;
+            --bg-overlay: #232334;
+            --bg-glass: rgba(28, 28, 40, 0.85);
+
+            --text-primary: #ffffff;
+            --text-secondary: #b4b4c8;
+            --text-muted: #6b6b80;
+
+            --border-subtle: #2a2a3a;
+            --border-strong: #3a3a4d;
+
+            --radius-sm: 10px;
+            --radius-md: 16px;
+            --radius-lg: 22px;
+            --radius-xl: 32px;
+            --radius-full: 999px;
+
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+            --shadow-md: 0 8px 24px rgba(0,0,0,0.4);
+            --shadow-lg: 0 16px 48px rgba(0,0,0,0.5);
+            --shadow-glow: 0 0 40px rgba(124,92,255,0.35);
+
+            --transition-fast: 0.15s ease;
+            --transition-base: 0.25s ease;
+            --transition-slow: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            --transition-bounce: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            height: 100%;
+            overflow-x: hidden;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-base);
+            color: var(--text-primary);
+            font-size: 15px;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        /* Fundo animado */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(circle at 15% 5%, rgba(124, 92, 255, 0.18), transparent 50%),
+                radial-gradient(circle at 85% 95%, rgba(79, 70, 229, 0.14), transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+            animation: bgShift 15s ease-in-out infinite;
+        }
+
+        @keyframes bgShift {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Container principal */
+        .container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 480px;
+            animation: fadeInUp 0.6s var(--transition-slow);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Card principal */
+        .card {
+            background: linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-elevated) 100%);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-xl);
+            padding: 40px 28px;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Borda luminosa sutil no topo */
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--color-primary), var(--color-accent), var(--color-primary));
+            background-size: 200% 100%;
+            animation: gradientSlide 4s linear infinite;
+        }
+
+        @keyframes gradientSlide {
+            0% { background-position: 0% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        /* Logo animado */
+        .logo {
+            width: 88px;
+            height: 88px;
+            border-radius: 26px;
+            background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 42px;
+            margin: 0 auto 24px;
+            box-shadow: var(--shadow-glow);
+            animation: logoFloat 3s ease-in-out infinite;
+            position: relative;
+        }
+
+        .logo::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: inherit;
+            background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+            filter: blur(16px);
+            opacity: 0.5;
+            z-index: -1;
+        }
+
+        @keyframes logoFloat {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-6px) scale(1.02); }
+        }
+
+        /* Títulos */
+        h1 {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            letter-spacing: -0.03em;
+            text-align: center;
+            line-height: 1.25;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: var(--text-muted);
+            font-weight: 500;
+            text-align: center;
+            margin-bottom: 24px;
+            line-height: 1.55;
+        }
+
+        /* Info box */
+        .info-box {
+            background: var(--bg-base);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            font-size: 13.5px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .info-row:first-child {
+            padding-top: 0;
+        }
+
+        .info-label {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: var(--text-primary);
+            font-weight: 700;
+            text-align: right;
+            max-width: 60%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .info-value.success {
+            color: var(--color-success);
+        }
+
+        /* Alerta */
+        .alert {
+            padding: 14px 16px;
+            border-radius: var(--radius-md);
+            margin-bottom: 20px;
+            font-size: 13.5px;
+            line-height: 1.55;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .alert i {
+            font-size: 16px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .alert-content {
+            flex: 1;
+        }
+
+        .alert-content strong {
+            display: block;
+            margin-bottom: 2px;
+            font-weight: 700;
+        }
+
+        .alert.success {
+            background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            color: var(--color-success);
+        }
+
+        .alert.error {
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            color: var(--color-danger);
+        }
+
+        .alert.warning {
+            background: rgba(245, 158, 11, 0.08);
+            border: 1px solid rgba(245, 158, 11, 0.25);
+            color: var(--color-warning);
+        }
+
+        .alert.info {
+            background: rgba(124, 92, 255, 0.08);
+            border: 1px solid rgba(124, 92, 255, 0.25);
+            color: var(--color-primary-light);
+        }
+
+        /* Password input */
+        .password-box {
+            position: relative;
+            margin-bottom: 16px;
+        }
+
+        .password-box label {
+            display: block;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .password-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .password-input-wrapper i.input-icon {
+            position: absolute;
+            left: 16px;
+            color: var(--text-muted);
+            font-size: 15px;
+            pointer-events: none;
+            transition: color var(--transition-base);
+        }
+
+        .password-input {
+            width: 100%;
+            padding: 16px 48px 16px 46px;
+            background: var(--bg-base);
+            border: 2px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 0.15em;
+            transition: all var(--transition-base);
+            outline: none;
+            font-family: inherit;
+        }
+
+        .password-input::placeholder {
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .password-input:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 4px rgba(124, 92, 255, 0.15);
+            background: var(--bg-surface);
+        }
+
+        .password-input:focus + i.input-icon,
+        .password-input-wrapper:focus-within i.input-icon {
+            color: var(--color-primary);
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 12px;
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition-fast);
+        }
+
+        .toggle-password:active {
+            background: var(--bg-overlay);
+            color: var(--text-primary);
+            transform: scale(0.9);
+        }
+
+        /* Botão principal */
+        .btn {
+            width: 100%;
+            padding: 16px 24px;
+            border-radius: var(--radius-md);
+            font-size: 15px;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all var(--transition-base);
+            letter-spacing: -0.01em;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:active:not(:disabled) {
+            transform: scale(0.97);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+            color: white;
+            box-shadow: 0 8px 24px rgba(124, 92, 255, 0.4);
+        }
+
+        .btn-primary:active:not(:disabled) {
+            box-shadow: 0 12px 32px rgba(124, 92, 255, 0.6);
+        }
+
+        .btn.loading {
+            pointer-events: none;
+        }
+
+        .btn.loading::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            animation: shimmer 1.2s linear infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .btn i {
+            font-size: 15px;
+        }
+
+        /* Loading spinner dentro do botão */
+        .btn .spinner {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            animation: spin 0.7s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Contador de tentativas */
+        .attempts {
+            text-align: center;
+            font-size: 12.5px;
+            color: var(--text-muted);
+            margin-top: 14px;
+            font-weight: 600;
+        }
+
+        .attempts strong {
+            color: var(--color-warning);
+        }
+
+        /* Estado: produtos liberados */
+        .products-container {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            margin-top: 20px;
+        }
+
+        .product-item {
+            background: var(--bg-base);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 18px;
+            animation: productPop 0.5s var(--transition-slow) backwards;
+            position: relative;
+        }
+
+        .product-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--color-success), transparent);
+        }
+
+        .product-item:nth-child(1) { animation-delay: 0.1s; }
+        .product-item:nth-child(2) { animation-delay: 0.2s; }
+        .product-item:nth-child(3) { animation-delay: 0.3s; }
+        .product-item:nth-child(4) { animation-delay: 0.4s; }
+        .product-item:nth-child(5) { animation-delay: 0.5s; }
+
+        @keyframes productPop {
+            from {
+                opacity: 0;
+                transform: scale(0.95) translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .product-item-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            font-weight: 800;
+            color: var(--color-success);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 14px;
+        }
+
+        .product-field {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px dashed var(--border-subtle);
+            font-size: 13.5px;
+        }
+
+        .product-field:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .product-field-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 8px;
+            background: rgba(124, 92, 255, 0.12);
+            color: var(--color-primary-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .product-field-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .product-field-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 3px;
+        }
+
+        .product-field-value {
+            color: var(--text-primary);
+            font-weight: 700;
+            font-size: 14px;
+            word-break: break-all;
+            line-height: 1.4;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .product-field-value code {
+            font-family: 'Courier New', monospace;
+            background: var(--bg-surface);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            flex: 1;
+            word-break: break-all;
+        }
+
+        .copy-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            background: rgba(124, 92, 255, 0.12);
+            border: 1px solid rgba(124, 92, 255, 0.25);
+            color: var(--color-primary-light);
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition-fast);
+            flex-shrink: 0;
+        }
+
+        .copy-btn:active {
+            background: var(--color-primary);
+            color: white;
+            transform: scale(0.9);
+        }
+
+        .copy-btn.copied {
+            background: var(--color-success);
+            color: white;
+            border-color: var(--color-success);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        .footer a {
+            color: var(--color-primary-light);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 10, 15, 0.9);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .loading-spinner {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            border: 3px solid var(--border-subtle);
+            border-top-color: var(--color-primary);
+            animation: spin 0.8s linear infinite;
+        }
+
+        .loading-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            left: 16px;
+            right: 16px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            color: var(--text-primary);
+            font-size: 13.5px;
+            font-weight: 600;
+            animation: toastSlide 0.4s var(--transition-slow);
+            pointer-events: auto;
+        }
+
+        @keyframes toastSlide {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .toast.removing {
+            animation: toastOut 0.3s ease forwards;
+        }
+
+        @keyframes toastOut {
+            to {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+        }
+
+        .toast-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+
+        .toast.success .toast-icon {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--color-success);
+        }
+
+        .toast.error .toast-icon {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--color-danger);
+        }
+
+        .toast.info .toast-icon {
+            background: rgba(124, 92, 255, 0.15);
+            color: var(--color-primary-light);
+        }
+
+        /* Utilitários */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Responsivo */
+        @media (max-width: 400px) {
+            .card {
+                padding: 32px 20px;
+                border-radius: 24px;
+            }
+
+            h1 {
+                font-size: 21px;
+            }
+
+            .logo {
+                width: 76px;
+                height: 76px;
+                font-size: 36px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ============================================
+     🔔 TOASTS
+     ============================================ -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ============================================
+     ⏳ LOADING
+     ============================================ -->
+<div class="loading-overlay" id="loading-overlay" style="display: none;">
+    <div class="loading-spinner"></div>
+    <div class="loading-text" id="loading-text">Carregando...</div>
+</div>
+
+<!-- ============================================
+     🎯 CONTAINER PRINCIPAL
+     ============================================ -->
+<div class="container">
+    <div class="card" id="card">
+
+        <!-- ─── ESTADO: LOADING INICIAL ─── -->
+        <div id="state-loading">
+            <div class="logo">🔐</div>
+            <h1>Verificando link...</h1>
+            <p class="subtitle">Aguarde um instante</p>
+        </div>
+
+        <!-- ─── ESTADO: LINK INVÁLIDO / EXPIRADO ─── -->
+        <div id="state-invalid" class="hidden">
+            <div class="logo" style="background: linear-gradient(135deg, #ef4444, #dc2626);">⚠️</div>
+            <h1>Link inválido</h1>
+            <p class="subtitle" id="invalid-message">Este link não é válido ou expirou.</p>
+
+            <div class="alert error" id="invalid-detail" style="display: none;">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <div class="alert-content">
+                    <strong>Atenção</strong>
+                    <span id="invalid-detail-text"></span>
+                </div>
+            </div>
+
+            <div class="alert info">
+                <i class="fa-solid fa-circle-info"></i>
+                <div class="alert-content">
+                    <strong>Precisa de ajuda?</strong>
+                    Volte ao Telegram e use <strong>/atendimento</strong> para falar com nosso suporte.
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── ESTADO: PEDIR SENHA ─── -->
+        <div id="state-password" class="hidden">
+            <div class="logo">🔐</div>
+            <h1>Ativar produto</h1>
+            <p class="subtitle">Digite sua senha de saque para liberar o produto.</p>
+
+            <!-- Info do pedido -->
+            <div class="info-box">
+                <div class="info-row">
+                    <span class="info-label">Produto</span>
+                    <span class="info-value" id="info-product">—</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Pedido</span>
+                    <span class="info-value" id="info-order">—</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Quantidade</span>
+                    <span class="info-value" id="info-quantity">—</span>
+                </div>
+                <div class="info-row" id="info-expires-row" style="display: none;">
+                    <span class="info-label">Vence em</span>
+                    <span class="info-value" id="info-expires">—</span>
+                </div>
+            </div>
+
+            <!-- Form de senha -->
+            <form id="password-form" autocomplete="off">
+                <div class="password-box">
+                    <label for="password">Sua senha</label>
+                    <div class="password-input-wrapper">
+                        <i class="fa-solid fa-lock input-icon"></i>
+                        <input
+                            type="password"
+                            id="password"
+                            class="password-input"
+                            placeholder="••••"
+                            inputmode="numeric"
+                            pattern="[0-9]*"
+                            maxlength="32"
+                            autocomplete="off"
+                            required
+                        >
+                        <button
+                            type="button"
+                            class="toggle-password"
+                            id="toggle-password"
+                            aria-label="Mostrar senha"
+                        >
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="submit-btn">
+                    <i class="fa-solid fa-lock-open"></i>
+                    <span>Ativar produto</span>
+                </button>
+            </form>
+
+            <div class="attempts hidden" id="attempts-info">
+                Tentativas restantes: <strong id="attempts-count">5</strong>
+            </div>
+
+            <div class="alert warning" style="margin-top: 20px;">
+                <i class="fa-solid fa-shield-halved"></i>
+                <div class="alert-content">
+                    <strong>Por que pedir senha?</strong>
+                    Sua senha protege os dados do produto. Ela é a mesma que você cadastrou no bot.
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── ESTADO: PRODUTO LIBERADO ─── -->
+        <div id="state-success" class="hidden">
+            <div class="logo" style="background: linear-gradient(135deg, #10b981, #059669);">✓</div>
+            <h1>Produto liberado!</h1>
+            <p class="subtitle" id="success-subtitle">Aqui estão seus dados. Guarde em local seguro.</p>
+
+            <!-- Info do pedido -->
+            <div class="info-box">
+                <div class="info-row">
+                    <span class="info-label">Produto</span>
+                    <span class="info-value success" id="success-product">—</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Quantidade</span>
+                    <span class="info-value" id="success-quantity">—</span>
+                </div>
+                <div class="info-row" id="success-expires-row" style="display: none;">
+                    <span class="info-label">Vence em</span>
+                    <span class="info-value" id="success-expires">—</span>
+                </div>
+            </div>
+
+            <div class="alert success">
+                <i class="fa-solid fa-circle-check"></i>
+                <div class="alert-content">
+                    <strong>Pronto para usar!</strong>
+                    Copie os dados abaixo e use conforme descrito.
+                </div>
+            </div>
+
+            <!-- Produtos liberados -->
+            <div class="products-container" id="products-container"></div>
+
+            <div class="alert warning" style="margin-top: 20px;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                <div class="alert-content">
+                    <strong>Importante</strong>
+                    Não compartilhe esses dados. Cada login é único e monitorado.
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="footer">
+        🔐 Ambiente seguro · <span id="footer-brand">Larizinha Store</span>
+    </div>
+</div>
+
+<!-- ============================================
+     🚀 SCRIPT
+     ============================================ -->
+<script>
+(function() {
+    'use strict';
+
+    // ============================================
+    // 🌐 ESTADO
+    // ============================================
+    const State = {
+        token: '',
+        orderCode: '',
+        productName: '',
+        quantity: 0,
+        config: null,
+        password: '',
+    };
+
+    // ============================================
+    // 🧰 HELPERS
+    // ============================================
+    function $(id) { return document.getElementById(id); }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = String(str);
+        return div.innerHTML;
+    }
+
+    function formatDate(isoString) {
+        if (!isoString) return '—';
+        try {
+            const d = new Date(isoString);
+            return d.toLocaleDateString('pt-BR');
+        } catch (e) {
+            return '—';
+        }
+    }
+
+    function getTokenFromUrl() {
+        // URL: /webapp/activate/ORDER_CODE:SIGNATURE
+        // Pega o último pedaço da URL
+        const parts = window.location.pathname.split('/');
+        const last = parts[parts.length - 1];
+
+        if (last && last.includes(':') && last.length > 20) {
+            return decodeURIComponent(last);
+        }
+        return '';
+    }
+
+    // ============================================
+    // 🔔 TOAST
+    // ============================================
+    function toast(message, type = 'info', duration = 3200) {
+        const container = $('toast-container');
+        if (!container) return;
+
+        const icons = {
+            success: 'fa-check',
+            error: 'fa-xmark',
+            warning: 'fa-triangle-exclamation',
+            info: 'fa-circle-info',
+        };
+
+        const el = document.createElement('div');
+        el.className = `toast ${type}`;
+        el.innerHTML = `
+            <div class="toast-icon">
+                <i class="fa-solid ${icons[type] || icons.info}"></i>
+            </div>
+            <div>${escapeHtml(message)}</div>
+        `;
+
+        container.appendChild(el);
+
+        setTimeout(() => {
+            el.classList.add('removing');
+            setTimeout(() => el.remove(), 350);
+        }, duration);
+    }
+
+    // ============================================
+    // ⏳ LOADING
+    // ============================================
+    function showLoading(text) {
+        $('loading-text').textContent = text || 'Carregando...';
+        $('loading-overlay').style.display = 'flex';
+    }
+
+    function hideLoading() {
+        $('loading-overlay').style.display = 'none';
+    }
+
+    // ============================================
+    // 🎯 TROCA DE ESTADO
+    // ============================================
+    function showState(name) {
+        ['loading', 'invalid', 'password', 'success'].forEach((s) => {
+            const el = $(`state-${s}`);
+            if (el) {
+                if (s === name) el.classList.remove('hidden');
+                else el.classList.add('hidden');
+            }
+        });
+    }
+
+    // ============================================
+    // 📡 API
+    // ============================================
+    async function validateToken() {
+        const res = await fetch(`/api/activation/validate/${encodeURIComponent(State.token)}`);
+
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+        }
+
+        return res.json();
+    }
+
+    async function activateProduct(password) {
+        const res = await fetch(`/api/activation/activate/${encodeURIComponent(State.token)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password }),
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+
+        return res.json();
+    }
+
+    async function loadConfig() {
+        try {
+            const res = await fetch('/api/webapp/config');
+            if (res.ok) {
+                const config = await res.json();
+                applyConfig(config);
+                return config;
+            }
+        } catch (e) {
+            console.warn('Config não carregada:', e);
+        }
+        return null;
+    }
+
+    function applyConfig(config) {
+        State.config = config;
+        const root = document.documentElement;
+
+        if (config.colors) {
+            const c = config.colors;
+            if (c.primary) root.style.setProperty('--color-primary', c.primary);
+            if (c.accent) root.style.setProperty('--color-accent', c.accent);
+            if (c.success) root.style.setProperty('--color-success', c.success);
+            if (c.warning) root.style.setProperty('--color-warning', c.warning);
+            if (c.danger) root.style.setProperty('--color-danger', c.danger);
+        }
+
+        const brand = config.site_title || config.bot_name;
+        if (brand) {
+            const footerEl = $('footer-brand');
+            if (footerEl) footerEl.textContent = brand;
+            document.title = `Ativar Produto · ${brand}`;
+        }
+    }
+
+    // ============================================
+    // 🚀 INICIALIZAÇÃO
+    // ============================================
+    async function init() {
+        showState('loading');
+
+        // Pega token da URL
+        State.token = getTokenFromUrl();
+
+        if (!State.token) {
+            showInvalid('Link inválido', 'O link que você acessou não está no formato esperado.');
+            return;
+        }
+
+        // Carrega config
+        await loadConfig();
+
+        // Valida token
+        try {
+            const result = await validateToken();
+
+            if (!result.valid) {
+                showInvalid(
+                    'Link inválido',
+                    result.error || 'Este link não é válido ou já expirou.'
+                );
+                return;
+            }
+
+            // Guarda dados
+            State.orderCode = result.order_code;
+            State.productName = result.product_name;
+            State.quantity = result.quantity;
+
+            // Preenche info
+            const productEl = $('info-product');
+            const orderEl = $('info-order');
+            const quantityEl = $('info-quantity');
+
+            if (productEl) productEl.textContent = result.product_name || '—';
+            if (orderEl) orderEl.textContent = (result.order_code || '').slice(0, 16) + '...';
+            if (quantityEl) quantityEl.textContent = result.quantity || 1;
+
+            if (result.expires_at) {
+                const row = $('info-expires-row');
+                const val = $('info-expires');
+                if (row && val) {
+                    row.style.display = 'flex';
+                    val.textContent = formatDate(result.expires_at);
+                }
+            }
+
+            showState('password');
+        } catch (e) {
+            console.error(e);
+            showInvalid('Erro ao verificar link', e.message || 'Tente novamente mais tarde.');
+        }
+    }
+
+    function showInvalid(title, message) {
+        showState('invalid');
+        const titleEl = $('invalid-message');
+        const detailEl = $('invalid-detail');
+        const detailTextEl = $('invalid-detail-text');
+
+        if (titleEl) titleEl.textContent = message || 'Este link não é válido ou expirou.';
+
+        if (message && message.length > 60) {
+            if (detailEl) detailEl.style.display = 'flex';
+            if (detailTextEl) detailTextEl.textContent = message;
+            if (titleEl) titleEl.textContent = 'Este link não é mais válido';
+        }
+    }
+
+    // ============================================
+    // 🔐 SUBMIT DE SENHA
+    // ============================================
+    async function onSubmitPassword(e) {
+        e.preventDefault();
+
+        const input = $('password');
+        const submitBtn = $('submit-btn');
+
+        const password = (input.value || '').trim();
+
+        if (password.length < 4) {
+            toast('Senha muito curta', 'error');
+            return;
+        }
+
+        if (password.length > 32) {
+            toast('Senha muito longa', 'error');
+            return;
+        }
+
+        // Loading
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<div class="spinner"></div><span>Verificando...</span>';
+
+        try {
+            const result = await activateProduct(password);
+
+            if (!result.success) {
+                // Erro
+                if (result.attempts_remaining !== undefined && result.attempts_remaining !== null) {
+                    const infoEl = $('attempts-info');
+                    const countEl = $('attempts-count');
+                    if (infoEl) infoEl.classList.remove('hidden');
+                    if (countEl) countEl.textContent = result.attempts_remaining;
+                }
+
+                toast(result.error || 'Senha incorreta', 'error');
+
+                // Reset do botão
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fa-solid fa-lock-open"></i><span>Ativar produto</span>';
+
+                // Shake no input
+                input.style.animation = 'none';
+                setTimeout(() => {
+                    input.style.animation = 'shake 0.4s';
+                }, 10);
+                return;
+            }
+
+            // Sucesso
+            showSuccess(result);
+        } catch (e) {
+            console.error(e);
+            toast(e.message || 'Erro ao ativar', 'error');
+
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fa-solid fa-lock-open"></i><span>Ativar produto</span>';
+        }
+    }
+
+    // ============================================
+    // ✅ SUCESSO
+    // ============================================
+    function showSuccess(result) {
+        showState('success');
+
+        const productEl = $('success-product');
+        const quantityEl = $('success-quantity');
+        const subtitleEl = $('success-subtitle');
+
+        if (productEl) productEl.textContent = result.product_name || '—';
+        if (quantityEl) quantityEl.textContent = result.quantity || 1;
+        if (subtitleEl) {
+            subtitleEl.textContent = result.items && result.items.length > 1
+                ? `Aqui estão seus ${result.items.length} logins. Guarde em local seguro.`
+                : 'Aqui está seu login. Guarde em local seguro.';
+        }
+
+        if (result.expires_at) {
+            const row = $('success-expires-row');
+            const val = $('success-expires');
+            if (row && val) {
+                row.style.display = 'flex';
+                val.textContent = formatDate(result.expires_at);
+            }
+        }
+
+        // Renderiza os produtos
+        const container = $('products-container');
+        if (container) {
+            container.innerHTML = '';
+
+            (result.items || []).forEach((item, index) => {
+                const total = result.items.length;
+                const title = total > 1
+                    ? `Login ${index + 1} de ${total}`
+                    : 'Seus dados';
+
+                const el = document.createElement('div');
+                el.className = 'product-item';
+
+                let fieldsHtml = '';
+
+                if (item.email) {
+                    fieldsHtml += renderField('Email', item.email, 'fa-envelope', 'email-' + index);
+                }
+                if (item.password) {
+                    fieldsHtml += renderField('Senha', item.password, 'fa-key', 'password-' + index);
+                }
+                if (item.code) {
+                    fieldsHtml += renderField('Código/Link', item.code, 'fa-link', 'code-' + index);
+                }
+                if (item.note) {
+                    fieldsHtml += `
+                        <div class="product-field">
+                            <div class="product-field-icon">
+                                <i class="fa-solid fa-note-sticky"></i>
+                            </div>
+                            <div class="product-field-content">
+                                <div class="product-field-label">Nota</div>
+                                <div class="product-field-value" style="font-size:13px;font-weight:500;color:var(--text-secondary);">
+                                    ${escapeHtml(item.note)}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                el.innerHTML = `
+                    <div class="product-item-title">
+                        <i class="fa-solid fa-check-circle"></i>
+                        ${escapeHtml(title)}
+                    </div>
+                    ${fieldsHtml}
+                `;
+
+                container.appendChild(el);
+            });
+
+            // Attach copy buttons
+            container.querySelectorAll('.copy-btn').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const value = btn.getAttribute('data-value') || '';
+                    copyToClipboard(value, btn);
+                });
+            });
+        }
+
+        toast('Produto liberado com sucesso!', 'success');
+    }
+
+    function renderField(label, value, icon, id) {
+        const safeValue = escapeHtml(value);
+        return `
+            <div class="product-field">
+                <div class="product-field-icon">
+                    <i class="fa-solid ${icon}"></i>
+                </div>
+                <div class="product-field-content">
+                    <div class="product-field-label">${label}</div>
+                    <div class="product-field-value">
+                        <code>${safeValue}</code>
+                        <button
+                            class="copy-btn"
+                            data-value="${safeValue}"
+                            aria-label="Copiar ${label}"
+                            title="Copiar"
+                        >
+                            <i class="fa-solid fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function copyToClipboard(text, button) {
+        const done = () => {
+            button.classList.add('copied');
+            button.innerHTML = '<i class="fa-solid fa-check"></i>';
+            toast('Copiado!', 'success', 1800);
+            setTimeout(() => {
+                button.classList.remove('copied');
+                button.innerHTML = '<i class="fa-solid fa-copy"></i>';
+            }, 2000);
+        };
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done).catch(() => {
+                // Fallback
+                fallbackCopy(text);
+                done();
+            });
+        } else {
+            fallbackCopy(text);
+            done();
+        }
+    }
+
+    function fallbackCopy(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+    }
+
+    // ============================================
+    // 🎯 EVENTOS
+    // ============================================
+    function attachEvents() {
+        // Form
+        const form = $('password-form');
+        if (form) form.addEventListener('submit', onSubmitPassword);
+
+        // Toggle password
+        const toggle = $('toggle-password');
+        const input = $('password');
+
+        if (toggle && input) {
+            toggle.addEventListener('click', () => {
+                const isPassword = input.type === 'password';
+                input.type = isPassword ? 'text' : 'password';
+                toggle.innerHTML = isPassword
+                    ? '<i class="fa-solid fa-eye-slash"></i>'
+                    : '<i class="fa-solid fa-eye"></i>';
+            });
+        }
+
+        // Auto-focus
+        if (input) {
+            setTimeout(() => input.focus(), 300);
+        }
+    }
+
+    // ============================================
+    // 🎬 SHAKE ANIMATION
+    // ============================================
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            40% { transform: translateX(8px); }
+            60% { transform: translateX(-5px); }
+            80% { transform: translateX(5px); }
+        }
+    `;
+    document.head.appendChild(style);
+
+    // ============================================
+    // 🚀 BOOT
+    // ============================================
+    document.addEventListener('DOMContentLoaded', () => {
+        attachEvents();
+        init();
+    });
+
+})();
+</script>
+
+</body>
+</html>

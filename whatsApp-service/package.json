@@ -1,0 +1,30 @@
+{
+  "name": "larizinha-whatsapp-service",
+  "version": "1.0.0",
+  "description": "Serviço WhatsApp via Baileys para Larizinha Store",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "express": "^4.21.2",
+    "pino": "^9.5.0",
+    "qrcode": "^1.5.4",
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
+    "cors": "^2.8.5"
+  },
+  "keywords": [
+    "whatsapp",
+    "baileys",
+    "bot"
+  ],
+  "author": "Larizinha Store",
+  "license": "MIT"
+}

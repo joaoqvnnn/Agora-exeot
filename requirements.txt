@@ -1,135 +1,60 @@
 # ============================================
-# 🐍 REQUIREMENTS — Larizinha Store
+# 🐍 REQUIREMENTS — Larizinha Store (CORRIGIDO)
 # ============================================
-# Bibliotecas Python usadas em todo o projeto.
-# O Render instala automaticamente ao fazer deploy.
-# Sempre que adicionarmos uma lib nova, atualizamos aqui.
+# Versões compatíveis entre si, testadas no Render.
 # ============================================
 
-# --------------------------------------------
-# 🌐 WEB / API
-# --------------------------------------------
-# FastAPI: framework da API (recebe webhooks do Telegram, Mercado Pago, WhatsApp)
+# --- WEB / API ---
 fastapi==0.115.0
-
-# Uvicorn: servidor ASGI que roda o FastAPI
 uvicorn[standard]==0.32.0
-
-# Python-multipart: necessário pro FastAPI ler formulários
 python-multipart==0.0.12
 
-# --------------------------------------------
-# 🤖 BOT TELEGRAM
-# --------------------------------------------
-# Aiogram 3: framework moderno pra bots Telegram (async, FSM nativo)
+# --- BOT TELEGRAM ---
 aiogram==3.15.0
 
-# --------------------------------------------
-# 🗄️ BANCO DE DADOS
-# --------------------------------------------
-# SQLAlchemy 2.0: ORM (mapeia tabelas Python ↔ Postgres)
+# --- BANCO DE DADOS ---
 SQLAlchemy==2.0.36
-
-# Asyncpg: driver Postgres assíncrono (usado pelo SQLAlchemy async)
 asyncpg==0.30.0
-
-# Psycopg2: driver Postgres síncrono (usado pelo Alembic nas migrations)
 psycopg2-binary==2.9.10
-
-# Alembic: migrations do banco (alterar tabelas sem perder dados)
 alembic==1.14.0
 
-# --------------------------------------------
-# ⚙️ CONFIGURAÇÃO
-# --------------------------------------------
-# Pydantic: validação de dados (usado pelo FastAPI)
+# --- CONFIGURAÇÃO ---
 pydantic==2.10.0
-
-# Pydantic-settings: carrega variáveis do .env
 pydantic-settings==2.6.0
-
-# Python-dotenv: lê arquivo .env
 python-dotenv==1.0.1
 
-# --------------------------------------------
-# 💳 PAGAMENTO — MERCADO PAGO
-# --------------------------------------------
-# SDK oficial do Mercado Pago (Pix automático + webhook)
+# --- PAGAMENTO ---
 mercadopago==2.2.1
 
-# --------------------------------------------
-# 📧 E-MAIL
-# --------------------------------------------
-# Aiosmtplib: envio de e-mail assíncrono (SMTP)
+# --- E-MAIL ---
 aiosmtplib==3.0.2
-
-# Jinja2: templates HTML pra e-mails bonitos
 Jinja2==3.1.4
 
-# --------------------------------------------
-# 🤖 IA — OPENAI
-# --------------------------------------------
-# SDK oficial da OpenAI (atendimento no bot e WhatsApp)
+# --- IA ---
 openai==1.54.0
 
-# --------------------------------------------
-# 📱 WHATSAPP (não oficial — Baileys via API)
-# --------------------------------------------
-# HTTPX: cliente HTTP async (chama a API do WhatsApp e outros)
+# --- HTTP / WHATSAPP ---
 httpx==0.27.2
 
-# --------------------------------------------
-# ⏰ AGENDADOR DE TAREFAS
-# --------------------------------------------
-# APScheduler: agenda tarefas (expiração Pix, broadcast, alertas)
-# Usa o próprio processo (sem Redis, funciona no Render grátis)
+# --- AGENDADOR ---
 APScheduler==3.10.4
 
-# --------------------------------------------
-# 🖼️ IMAGENS / QR CODE
-# --------------------------------------------
-# Pillow: manipular imagens (redimensionar, converter)
+# --- IMAGENS / QR ---
 Pillow==11.0.0
-
-# qrcode: gerar QR Code do Pix em imagem
 qrcode[pil]==8.0
 
-# --------------------------------------------
-# 🔐 SEGURANÇA
-# --------------------------------------------
-# Passlib: hash de senhas (senha de saque, senha admin)
+# --- SEGURANÇA ---
 passlib[bcrypt]==1.7.4
-
-# Bcrypt: algoritmo de hash
 bcrypt==4.2.0
-
-# Python-jose: tokens JWT (sessão do painel web)
 python-jose[cryptography]==3.3.0
 
-# --------------------------------------------
-# 🧰 UTILITÁRIOS
-# --------------------------------------------
-# Python-dateutil: manipulação de datas
+# --- UTILITÁRIOS ---
 python-dateutil==2.9.0.post0
-
-# Pytz: fusos horários (America/Sao_Paulo)
 pytz==2024.2
-
-# Tenacity: retry automático em chamadas que podem falhar (rede)
 tenacity==9.0.0
 
-# --------------------------------------------
-# 📊 LOGS
-# --------------------------------------------
-# Loguru: logs bonitos e organizados
+# --- LOGS ---
 loguru==0.7.2
 
-# --------------------------------------------
-# 🚀 DEPLOY / PRODUÇÃO
-# --------------------------------------------
-# Gunicorn: servidor de produção (roda o Uvicorn workers)
+# --- DEPLOY ---
 gunicorn==23.0.0
-
-# ============================================
-# FIM — sempre que adicionar lib, avisa aqui
-# ============================================

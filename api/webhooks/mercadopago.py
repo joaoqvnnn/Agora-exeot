@@ -1,570 +1,271 @@
 # ============================================
-# 🧩 COMANDOS (CLIENTE) — Larizinha Store
+# 💳 WEBHOOK MERCADO PAGO — Larizinha Store
 # ============================================
-# Comandos slash do cliente:
-#   /pix, /historico, /afiliados, /id, /saldo,
-#   /ranking, /alertas, /gift, /cancelar,
-#   /atendimento, /termos, /menu
+# Recebe notificações de pagamento do Mercado Pago.
+# Confirma pagamentos REAIS e credita saldo.
 #
-# Cada comando respeita a config "cmd_X_enabled"
-# configurável pelo painel admin.
+# ⚠️ IMPORTANTE:
+#   Este arquivo usa APIRouter (FastAPI), NÃO o
+#   Router do aiogram. Não confundir!
 # ============================================
 
-from decimal import Decimal, InvalidOperation
+from datetime import datetime, timezone
+from decimal import Decimal
+from typing import Any
 
-from aiogram import F, Router
-from aiogram.filters import Command, CommandObject
-from aiogram.fsm.context import FSMContext
-from aiogram.types import (
-    CallbackQuery,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    Message,
-)
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
 from loguru import logger
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.states.states import RechargeStates
-from core.models import User
-from core.services import config as config_service
+from core.database import AsyncSessionLocal
+from core.models import Payment, PaymentStatus, User
+from core.services import payment as payment_service
+from core.services import pix as pix_service
 
 
-router = Router(name="comandos")
+# ⚠️ APIRouter (FastAPI) — NÃO usar aiogram.Router aqui
+router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 
 # ============================================
-# 🧰 AUXILIARES
+# 💳 ENDPOINT PRINCIPAL
 # ============================================
-def _format_brl(v) -> str:
-    if v is None:
-        return "0,00"
-    return f"{float(v):.2f}".replace(".", ",")
+@router.post("/mercadopago")
+async def mercadopago_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    x_signature: str | None = Header(None, alias="x-signature"),
+    x_request_id: str | None = Header(None, alias="x-request-id"),
+):
+    """Recebe webhook do Mercado Pago."""
+    try:
+        try:
+            body: dict[str, Any] = await request.json()
+        except Exception:
+            body = {}
+
+        payment_id = None
+
+        if isinstance(body, dict):
+            data = body.get("data", {})
+            if isinstance(data, dict):
+                payment_id = data.get("id")
+            if not payment_id:
+                payment_id = body.get("id")
+
+        if not payment_id:
+            payment_id = request.query_params.get("data.id")
+            if not payment_id:
+                payment_id = request.query_params.get("id")
+
+        if not payment_id:
+            logger.warning("⚠️ Webhook MP sem ID de pagamento")
+            return {"ok": True, "ignored": "sem id"}
+
+        payment_id = str(payment_id)
+        logger.info(f"💳 Webhook MP recebido: {payment_id}")
+
+        if x_signature:
+            valid = await pix_service.verify_webhook_signature(
+                x_signature=x_signature,
+                x_request_id=x_request_id or "",
+                data_id=payment_id,
+            )
+            if not valid:
+                logger.warning(f"🚫 Assinatura inválida: {payment_id}")
+                raise HTTPException(status_code=401, detail="invalid signature")
+
+        background_tasks.add_task(_process_mp_payment, payment_id)
+        return {"ok": True}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"❌ Erro no webhook MP: {e}")
+        return {"ok": True, "error": str(e)[:100]}
 
 
-async def _is_command_enabled(
-    session: AsyncSession,
-    cmd: str,
-) -> bool:
-    """Verifica se o comando está ativo no painel admin."""
-    value = await config_service.get_str(session, f"cmd_{cmd}_enabled", "true")
-    return str(value).lower() == "true"
+# ============================================
+# 🔄 PROCESSAR PAGAMENTO
+# ============================================
+async def _process_mp_payment(mp_payment_id: str) -> None:
+    async with AsyncSessionLocal() as session:
+        try:
+            mp_result = await pix_service.get_payment_status(mp_payment_id)
+
+            if not mp_result.get("success"):
+                logger.warning(f"⚠️ Falha MP {mp_payment_id}: {mp_result.get('error')}")
+                return
+
+            mp_status = mp_result.get("status", "unknown")
+            mp_detail = mp_result.get("status_detail", "")
+
+            logger.info(f"💳 MP {mp_payment_id} → status={mp_status}")
+
+            stmt = select(Payment).where(Payment.external_id == mp_payment_id)
+            result = await session.execute(stmt)
+            payment = result.scalar_one_or_none()
+
+            if payment is None:
+                logger.warning(f"⚠️ Pagamento {mp_payment_id} não encontrado")
+                return
+
+            if payment.status == PaymentStatus.APPROVED:
+                logger.info(f"ℹ️ Pagamento {payment.payment_id} já aprovado")
+                return
+
+            if pix_service.is_payment_approved(mp_status):
+                result = await payment_service.confirm_payment(
+                    session=session,
+                    payment_id=payment.payment_id,
+                    external_id=mp_payment_id,
+                    raw_webhook=mp_result.get("raw"),
+                )
+
+                if result.get("success"):
+                    await session.commit()
+                    logger.success(f"✅ Pagamento confirmado: {payment.payment_id}")
+                    await _notify_payment_approved(session, payment)
+                    if result.get("user"):
+                        await _handle_post_approval(session, result["user"], payment)
+                else:
+                    logger.error(f"❌ Erro: {result.get('error')}")
+                    await session.rollback()
+
+            elif pix_service.is_payment_expired(mp_status, mp_detail):
+                if payment.status == PaymentStatus.PENDING:
+                    payment.status = PaymentStatus.EXPIRED
+                    session.add(payment)
+                    await session.commit()
+                    logger.info(f"⌛ Expirando: {payment.payment_id}")
+                    await _notify_payment_expired(session, payment)
+
+            elif mp_status in ("rejected", "cancelled"):
+                if payment.status == PaymentStatus.PENDING:
+                    payment.status = PaymentStatus.REJECTED
+                    payment.webhook_data = mp_result.get("raw")
+                    session.add(payment)
+                    await session.commit()
+                    logger.info(f"❌ Rejeitado: {payment.payment_id}")
+
+            else:
+                logger.debug(f"ℹ️ {payment.payment_id} ainda pendente")
+
+        except Exception as e:
+            logger.exception(f"❌ Erro: {e}")
+            await session.rollback()
 
 
-async def _check_enabled(
-    target: Message,
-    session: AsyncSession,
-    cmd: str,
-) -> bool:
-    """Verifica se comando está ativo; se não, avisa."""
-    enabled = await _is_command_enabled(session, cmd)
-    if not enabled:
-        await target.answer(
-            f"⚠️ O comando /{cmd} está temporariamente desativado."
+# ============================================
+# 📢 NOTIFICAÇÕES
+# ============================================
+async def _notify_payment_approved(session, payment: Payment) -> None:
+    try:
+        from bot.handlers.admin.notifications import notify_pix_paid
+        from bot.loader import bot
+
+        await notify_pix_paid(
+            bot=bot,
+            session=session,
+            user_id=payment.user_telegram_id,
+            amount=float(payment.amount),
+            bonus=float(payment.bonus_amount or Decimal("0.00")),
         )
-        return False
-    return True
+    except Exception as e:
+        logger.debug(f"⚠️ Falha ao notificar: {e}")
 
 
-# ============================================
-# /menu — VOLTAR AO INÍCIO
-# ============================================
-@router.message(Command("menu"))
-async def cmd_menu(
-    message: Message,
-    user: User,
-    session: AsyncSession,
-) -> None:
-    if not await _check_enabled(message, session, "menu"):
-        return
+async def _notify_payment_expired(session, payment: Payment) -> None:
+    try:
+        from bot.loader import bot
 
-    from bot.keyboards.main_menu import build_main_menu
-    from core.config import settings
-    from core.services.messages import render_message
-
-    text = await render_message(
-        session,
-        key="start",
-        variables={
-            "USER_ID": user.telegram_id,
-            "USERNAME": user.username or user.first_name or "Usuário",
-            "BALANCE": _format_brl(user.balance),
-        },
-    )
-    keyboard = await build_main_menu(session, webapp_url=settings.webapp_url)
-    await message.answer(text, reply_markup=keyboard)
-
-
-# ============================================
-# /id — MOSTRA O ID DO CLIENTE
-# ============================================
-@router.message(Command("id"))
-async def cmd_id(
-    message: Message,
-    user: User,
-    session: AsyncSession,
-) -> None:
-    if not await _check_enabled(message, session, "id"):
-        return
-
-    await message.answer(
-        f"🆔 <b>Seu id é:</b> <code>{user.telegram_id}</code>"
-    )
-
-
-# ============================================
-# /saldo — MOSTRA O SALDO
-# ============================================
-@router.message(Command("saldo"))
-async def cmd_saldo(
-    message: Message,
-    user: User,
-    session: AsyncSession,
-) -> None:
-    if not await _check_enabled(message, session, "saldo"):
-        return
-
-    balance = _format_brl(user.balance)
-
-    text = (
-        f"╭───────────────────╮\n"
-        f"💰 Carteira id: <code>{user.telegram_id}</code>\n"
-        f"💸 Saldo: <b>R$ {balance}</b>\n"
-        f"╰───────────────────╯"
-    )
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="💰 Recarregar", callback_data="menu:recarregar")],
-            [InlineKeyboardButton(text="👤 Meu Perfil", callback_data="menu:perfil")],
-        ]
-    )
-
-    await message.answer(text, reply_markup=keyboard)
-
-
-# ============================================
-# /pix — GERAR PIX DIRETO
-# ============================================
-@router.message(Command("pix"))
-async def cmd_pix(
-    message: Message,
-    command: CommandObject,
-    state: FSMContext,
-    user: User,
-    session: AsyncSession,
-) -> None:
-    if not await _check_enabled(message, session, "pix"):
-        return
-
-    arg = (command.args or "").strip()
-
-    # Sem argumento → mostra exemplo
-    if not arg:
-        await message.answer(
-            f"⚠️ <b>Você enviou em um formato incorreto.</b>\n\n"
-            f"Envie /pix e o valor que deseja recarregar.\n\n"
-            f"<b>Exemplos:</b>\n"
-            f"• <code>/pix 10</code>\n"
-            f"• <code>/pix 5.25</code>\n"
-            f"• <code>/pix 50</code>"
+        text = (
+            f"⌛️ <b>PAGAMENTO PIX EXPIRADO</b>\n\n"
+            f"⚠️ O tempo limite foi excedido.\n\n"
+            f"🆔 Referência: <code>{payment.payment_id}</code>\n"
+            f"💸 Valor: <b>R$ {float(payment.amount):.2f}</b>\n\n"
+            f"💡 Use /menu para gerar um novo Pix."
         )
-        return
 
-    # Normaliza
-    raw = arg.replace(",", ".").replace("R$", "").strip()
+        await bot.send_message(
+            chat_id=payment.user_telegram_id,
+            text=text,
+            parse_mode="HTML",
+        )
+    except Exception as e:
+        logger.debug(f"⚠️ Falha ao notificar: {e}")
+
+
+# ============================================
+# 📦 PÓS-APROVAÇÃO
+# ============================================
+async def _handle_post_approval(session, user: User, payment: Payment) -> None:
+    from core.models import PaymentType
 
     try:
-        amount = Decimal(raw)
-        if amount <= 0:
-            raise InvalidOperation
-    except (InvalidOperation, ValueError):
-        await message.answer(
-            f"❌ <b>Valor inválido.</b>\n\n"
-            f"Envie apenas números. Exemplo:\n"
-            f"• <code>/pix 10</code>\n"
-            f"• <code>/pix 5.25</code>"
-        )
-        return
+        from bot.loader import bot
 
-    amount = amount.quantize(Decimal("0.01"))
+        if payment.type == PaymentType.RECHARGE:
+            credited = payment.total_credited or payment.amount
+            bonus = payment.bonus_amount or Decimal("0.00")
 
-    # Valida limites
-    min_amount = await config_service.get_decimal(session, "pix_min", "4.00")
-    max_amount = await config_service.get_decimal(session, "pix_max", "500.00")
+            text = (
+                f"✅ <b>PAGAMENTO APROVADO!</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"💰 Valor: <b>R$ {float(payment.amount):.2f}</b>\n"
+            )
+            if bonus > 0:
+                text += f"🎁 Bônus: <b>R$ {float(bonus):.2f}</b>\n"
 
-    if amount < min_amount:
-        await message.answer(
-            f"❌ Valor mínimo para recarga: <b>R$ {_format_brl(min_amount)}</b>"
-        )
-        return
+            text += (
+                f"💵 Saldo atual: <b>R$ {float(user.balance):.2f}</b>\n\n"
+                f"🆔 ID: <code>{payment.payment_id}</code>"
+            )
 
-    if amount > max_amount:
-        await message.answer(
-            f"❌ Valor máximo para recarga: <b>R$ {_format_brl(max_amount)}</b>"
-        )
-        return
+            try:
+                await bot.send_message(
+                    chat_id=user.telegram_id,
+                    text=text,
+                    parse_mode="HTML",
+                )
+            except Exception as e:
+                logger.warning(f"⚠️ Falha ao notificar: {e}")
 
-    # Gera o Pix
-    from bot.handlers.pix import _create_pix_message
+        elif payment.type == PaymentType.PURCHASE and payment.order_id:
+            from core.services import delivery as delivery_service
 
-    await _create_pix_message(
-        message=message,
-        user=user,
-        session=session,
-        amount=amount,
-        purpose="recharge",
-    )
+            result = await delivery_service.deliver_order(
+                session=session,
+                bot=bot,
+                order_id=payment.order_id,
+            )
 
+            if not result.get("success"):
+                logger.error(f"❌ Falha ao entregar: {result.get('error')}")
 
-# ============================================
-# /historico — HISTÓRICO DE COMPRAS
-# ============================================
-@router.message(Command("historico"))
-async def cmd_historico(
-    message: Message,
-    user: User,
-    session: AsyncSession,
-) -> None:
-    if not await _check_enabled(message, session, "historico"):
-        return
+        await session.commit()
 
-    # Reusa o handler do perfil via callback fake
-    # (mais simples e evita duplicação)
-    from bot.handlers.perfil import _show_history
-
-    # Cria um CallbackQuery "fake" a partir da mensagem
-    # Não é possível criar diretamente — então vamos replicar
-    # a lógica aqui de forma simples:
-
-    from datetime import datetime, timezone
-    from sqlalchemy import func
-
-    now = datetime.now(timezone.utc)
-
-    from core.models import Order, OrderStatus, StockItem
-
-    stmt = (
-        select(Order)
-        .where(
-            Order.user_id == user.id,
-            Order.status.in_([OrderStatus.PAID, OrderStatus.DELIVERED]),
-        )
-        .order_by(Order.created_at.desc())
-        .limit(10)
-    )
-    result = await session.execute(stmt)
-    orders = list(result.scalars().all())
-
-    if not orders:
-        await message.answer(
-            f"📜 <b>Histórico de compras</b>\n\n"
-            f"Você ainda não realizou nenhuma compra.\n\n"
-            f"🛍 Use /menu para ver o catálogo."
-        )
-        return
-
-    total = len(orders)
-
-    lines = [
-        f"📜 <b>Histórico de compras</b>",
-        f"━━━━━━━━━━━━━━━━━━━━━━",
-        f"📊 Total: <b>{total}</b>",
-        "",
-    ]
-
-    for order in orders[:5]:
-        date = order.created_at.strftime("%d/%m/%Y") if order.created_at else "—"
-        exp = order.expires_at.strftime("%d/%m/%Y") if order.expires_at else "—"
-
-        lines.append(f"🛍 <b>{order.product_name}</b>")
-        lines.append(
-            f"├ ⏰ {date} → {exp}\n"
-            f"├ 💰 R$ {_format_brl(order.total_price)}\n"
-            f"├ 🎫 <code>{order.order_code[:16]}...</code>"
-        )
-
-        # Pega primeiro item
-        item_stmt = select(StockItem).where(
-            StockItem.order_id == order.id
-        ).limit(1)
-        item_result = await session.execute(item_stmt)
-        item = item_result.scalar_one_or_none()
-
-        if item:
-            lines.append(f"├ 📧 <code>{item.email or 'N/A'}</code>")
-            lines.append(f"└ 🔑 <code>{item.password or 'N/A'}</code>")
-
-        lines.append("")
-
-    if total > 5:
-        lines.append(f"<i>+{total - 5} compras antigas (veja no perfil)</i>")
-
-    text = "\n".join(lines)
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="👤 Ver completo", callback_data="menu:perfil")],
-            [InlineKeyboardButton(text="🔙 Voltar", callback_data="menu:voltar")],
-        ]
-    )
-
-    if len(text) > 4000:
-        text = text[:4000] + "\n\n<i>... (truncado)</i>"
-
-    await message.answer(text, reply_markup=keyboard)
+    except Exception as e:
+        logger.exception(f"❌ Erro pós-aprovação: {e}")
+        await session.rollback()
 
 
 # ============================================
-# /afiliados — PROGRAMA DE AFILIADOS
+# 🧪 TESTES
 # ============================================
-@router.message(Command("afiliados"))
-async def cmd_afiliados(
-    message: Message,
-    user: User,
-    session: AsyncSession,
-) -> None:
-    if not await _check_enabled(message, session, "afiliados"):
-        return
-
-    enabled = await config_service.get_bool(session, "affiliate_enabled", True)
-    if not enabled:
-        await message.answer("⚠️ O programa de afiliados está temporariamente desativado.")
-        return
-
-    # Reusa a lógica de afiliados enviando uma mensagem nova
-    from sqlalchemy import func
-    from core.models import AffiliateCommission
-    from core.config import settings
-
-    commission = await config_service.get_str(session, "affiliate_commission", "20.0")
-    min_withdrawal = await config_service.get_str(session, "affiliate_min_withdrawal", "20.00")
-
-    referrals = await session.scalar(
-        select(func.count(User.id)).where(User.referred_by == user.telegram_id)
-    ) or 0
-
-    total_earned = await session.scalar(
-        select(func.coalesce(func.sum(AffiliateCommission.commission), 0)).where(
-            AffiliateCommission.affiliate_telegram_id == user.telegram_id
-        )
-    ) or Decimal("0.00")
-
-    media = (
-        (total_earned / referrals).quantize(Decimal("0.01"))
-        if referrals > 0 else Decimal("0.00")
-    )
-
-    bot_username = settings.telegram_bot_username or "meu_bot"
-    referral_link = f"https://t.me/{bot_username}?start={user.telegram_id}"
-
-    text = (
-        f"💰 <b>PROGRAMA DE AFILIADOS</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"⚙️ Status: <b>🟢 Ativo</b>\n"
-        f"🧲 Sua comissão: <b>{commission}%</b>\n\n"
-        f"👥 Indicações: <b>{referrals}</b>\n"
-        f"🪙 Total ganho: <b>R$ {_format_brl(total_earned)}</b>\n"
-        f"📊 Média: <b>R$ {_format_brl(media)}</b>\n"
-        f"💰 Saque mínimo: <b>R$ {min_withdrawal}</b>\n\n"
-        f"🔥 Saldo de comissões: <b>R$ {_format_brl(user.affiliate_balance)}</b>\n\n"
-        f"🔗 Seu link:\n<code>{referral_link}</code>"
-    )
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🤝 Abrir programa", callback_data="menu:afiliados")],
-            [InlineKeyboardButton(text="🔙 Voltar", callback_data="menu:voltar")],
-        ]
-    )
-
-    await message.answer(text, reply_markup=keyboard)
+@router.get("/mercadopago/test")
+async def mercadopago_test():
+    return {
+        "ok": True,
+        "message": "Webhook MP ativo",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
 
-# ============================================
-# /ranking — RANKINGS
-# ============================================
-@router.message(Command("ranking"))
-async def cmd_ranking(
-    message: Message,
-    user: User,
-    session: AsyncSession,
-) -> None:
-    if not await _check_enabled(message, session, "ranking"):
-        return
-
-    # Redireciona pro menu de ranking
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🏆 Ver rankings", callback_data="menu:ranking")],
-            [InlineKeyboardButton(text="🔙 Voltar", callback_data="menu:voltar")],
-        ]
-    )
-
-    await message.answer(
-        f"🏆 <b>Rankings</b>\n\n"
-        f"Clique no botão abaixo para ver os rankings completos.",
-        reply_markup=keyboard,
-    )
-
-
-# ============================================
-# /alertas — ALERTAS DE ESTOQUE
-# ============================================
-@router.message(Command("alertas"))
-async def cmd_alertas(
-    message: Message,
-    user: User,
-    session: AsyncSession,
-) -> None:
-    if not await _check_enabled(message, session, "alertas"):
-        return
-
-    enabled = await config_service.get_bool(session, "stock_alerts_enabled", True)
-    if not enabled:
-        await message.answer("⚠️ O sistema de alertas está temporariamente desativado.")
-        return
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🔔 Gerenciar alertas", callback_data="menu:alertas")],
-            [InlineKeyboardButton(text="🔙 Voltar", callback_data="menu:voltar")],
-        ]
-    )
-
-    await message.answer(
-        f"🔔 <b>Sistema de Alertas</b>\n\n"
-        f"Escolha quais produtos você quer ser notificado quando voltarem ao estoque.",
-        reply_markup=keyboard,
-    )
-
-
-# ============================================
-# /gift — RESGATAR GIFT CARD
-# ============================================
-@router.message(Command("gift"))
-async def cmd_gift(
-    message: Message,
-    user: User,
-    session: AsyncSession,
-) -> None:
-    if not await _check_enabled(message, session, "gift"):
-        return
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🎁 Resgatar Gift Card", callback_data="gift:resgatar")],
-            [InlineKeyboardButton(text="🔙 Voltar", callback_data="menu:voltar")],
-        ]
-    )
-
-    await message.answer(
-        f"🎁 <b>Resgatar Gift Card</b>\n\n"
-        f"Clique no botão abaixo para resgatar seu código.",
-        reply_markup=keyboard,
-    )
-
-
-# ============================================
-# /atendimento — ATENDIMENTO
-# ============================================
-@router.message(Command("atendimento"))
-async def cmd_atendimento(
-    message: Message,
-    user: User,
-    session: AsyncSession,
-) -> None:
-    if not await _check_enabled(message, session, "atendimento"):
-        return
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🎧 Abrir atendimento", callback_data="menu:atendimento")],
-            [InlineKeyboardButton(text="🔙 Voltar", callback_data="menu:voltar")],
-        ]
-    )
-
-    await message.answer(
-        f"🎧 <b>Atendimento</b>\n\n"
-        f"Escolha como deseja ser atendido.",
-        reply_markup=keyboard,
-    )
-
-
-# ============================================
-# /cancelar — CANCELA ESTADO ATUAL
-# ============================================
-@router.message(Command("cancelar"))
-async def cmd_cancelar(
-    message: Message,
-    state: FSMContext,
-    user: User,
-    session: AsyncSession,
-) -> None:
-    current = await state.get_state()
-
-    if current is None:
-        await message.answer("ℹ️ Nada para cancelar.")
-        return
-
-    # Se tem reserva, libera
-    data = await state.get_data()
-    product_id = data.get("product_id")
-
-    if product_id:
-        from core.services import stock as stock_service
-        await stock_service.release_reservation(
-            session, user.telegram_id, product_id
-        )
-
-    await state.clear()
-
-    await message.answer(
-        f"❌ <b>Operação cancelada!</b>\n\n"
-        f"Use /menu para voltar ao início."
-    )
-
-
-# ============================================
-# 🔘 FALLBACK: mensagem solta sem estado
-# ============================================
-@router.message(F.text.regexp(r"^\d+([.,]\d{1,2})?$"))
-async def msg_number_without_state(
-    message: Message,
-    state: FSMContext,
-    session: AsyncSession,
-) -> None:
-    """
-    Se o usuário mandar um número solto sem contexto,
-    sugerimos /pix ou avisamos que não há operação ativa.
-    """
-    current_state = await state.get_state()
-
-    # Se tem estado, deixa os outros handlers tratarem
-    if current_state is not None:
-        return
-
-    raw = (message.text or "").strip()
-    try:
-        amount = Decimal(raw.replace(",", "."))
-    except (InvalidOperation, ValueError):
-        return
-
-    if amount <= 0:
-        return
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(
-                text=f"💠 Gerar Pix de R$ {_format_brl(amount)}",
-                callback_data=f"pix:gerar:{amount}:",
-            )],
-            [InlineKeyboardButton(text="🔙 Menu principal", callback_data="menu:voltar")],
-        ]
-    )
-
-    await message.answer(
-        f"💡 Você enviou <b>R$ {_format_brl(amount)}</b>.\n\n"
-        f"Deseja gerar um Pix nesse valor?",
-        reply_markup=keyboard,
-    )
+@router.post("/mercadopago/check/{payment_id}")
+async def check_payment_manually(
+    payment_id: str,
+    background_tasks: BackgroundTasks,
+):
+    background_tasks.add_task(_process_mp_payment, payment_id)
+    return {"ok": True, "message": f"Verificação agendada para {payment_id}"}

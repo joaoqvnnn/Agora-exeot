@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0a0a0f" id="theme-color-meta">
+    <meta name="description" content="Cadastro bancário - Larizinha Store">
+    <meta name="robots" content="noindex, nofollow">
+
+    <title>Conta Bancária · Larizinha Store</title>
+
+    <!-- Fontes -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <style>
+        /* ============================================
+           🎨 DESIGN SYSTEM
+           ============================================ */
+        :root {
+            --color-primary: #7c5cff;
+            --color-primary-light: #a78bfa;
+            --color-primary-dark: #4f46e5;
+            --color-accent: #4f46e5;
+            --color-success: #10b981;
+            --color-warning: #f59e0b;
+            --color-danger: #ef4444;
+
+            --bg-base: #0a0a0f;
+            --bg-surface: #14141c;
+            --bg-elevated: #1c1c28;
+            --bg-overlay: #232334;
+            --bg-glass: rgba(28, 28, 40, 0.85);
+
+            --text-primary: #ffffff;
+            --text-secondary: #b4b4c8;
+            --text-muted: #6b6b80;
+
+            --border-subtle: #2a2a3a;
+            --border-strong: #3a3a4d;
+
+            --radius-sm: 10px;
+            --radius-md: 16px;
+            --radius-lg: 22px;
+            --radius-xl: 32px;
+            --radius-full: 999px;
+
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+            --shadow-md: 0 8px 24px rgba(0,0,0,0.4);
+            --shadow-lg: 0 16px 48px rgba(0,0,0,0.5);
+            --shadow-glow: 0 0 40px rgba(124,92,255,0.35);
+
+            --transition-fast: 0.15s ease;
+            --transition-base: 0.25s ease;
+            --transition-slow: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            --transition-bounce: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            min-height: 100%;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-base);
+            color: var(--text-primary);
+            font-size: 15px;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        /* Fundo gradiente */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(circle at 15% 5%, rgba(124, 92, 255, 0.15), transparent 50%),
+                radial-gradient(circle at 85% 95%, rgba(79, 70, 229, 0.12), transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 480px;
+            margin: 0 auto;
+            animation: fadeInUp 0.5s var(--transition-slow);
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ============================================
+           🏦 HEADER
+           ============================================ */
+        .page-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+
+        .page-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            flex-shrink: 0;
+            box-shadow: var(--shadow-glow);
+        }
+
+        .page-title-group {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .page-title {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--text-primary);
+            letter-spacing: -0.03em;
+            line-height: 1.2;
+        }
+
+        .page-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            font-weight: 500;
+            margin-top: 2px;
+        }
+
+        /* ============================================
+           📋 CARD
+           ============================================ */
+        .card {
+            background: linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-elevated) 100%);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .card-title {
+            font-size: 15px;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            letter-spacing: -0.01em;
+        }
+
+        .card-title i {
+            color: var(--color-primary-light);
+            font-size: 15px;
+        }
+
+        .card-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        /* ============================================
+           📝 FORM
+           ============================================ */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .form-label .required {
+            color: var(--color-danger);
+            margin-left: 3px;
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--bg-base);
+            border: 2px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 15px;
+            font-weight: 600;
+            font-family: inherit;
+            transition: all var(--transition-base);
+            outline: none;
+            appearance: none;
+            -webkit-appearance: none;
+        }
+
+        .form-input::placeholder {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 4px rgba(124, 92, 255, 0.15);
+            background: var(--bg-surface);
+        }
+
+        .form-input.invalid,
+        .form-select.invalid {
+            border-color: var(--color-danger);
+        }
+
+        /* Select customizado */
+        .select-wrapper {
+            position: relative;
+        }
+
+        .select-wrapper::after {
+            content: '\f107';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            pointer-events: none;
+            font-size: 14px;
+        }
+
+        .form-select {
+            padding-right: 42px;
+            cursor: pointer;
+        }
+
+        .form-select option {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            padding: 12px;
+        }
+
+        /* Grid 2 colunas */
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        /* ============================================
+           🔘 BOTÕES
+           ============================================ */
+        .btn {
+            width: 100%;
+            padding: 15px 24px;
+            border-radius: var(--radius-md);
+            font-size: 15px;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all var(--transition-base);
+            letter-spacing: -0.01em;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .btn:active:not(:disabled) {
+            transform: scale(0.97);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+            color: white;
+            box-shadow: 0 8px 24px rgba(124, 92, 255, 0.4);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--color-danger);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-danger:active {
+            background: var(--color-danger);
+            color: white;
+        }
+
+        .btn-ghost {
+            background: var(--bg-surface);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-subtle);
+        }
+
+        .btn-ghost:active {
+            background: var(--bg-overlay);
+            color: var(--text-primary);
+        }
+
+        .btn .spinner {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            animation: spin 0.7s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ============================================
+           📊 CARD DE CONTA SALVA
+           ============================================ */
+        .account-card {
+            background: var(--bg-base);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 18px;
+            margin-bottom: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .account-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--color-success), #059669);
+        }
+
+        .account-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--color-success);
+            border-radius: var(--radius-full);
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 14px;
+        }
+
+        .account-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            font-size: 13.5px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .account-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .account-row:first-of-type {
+            padding-top: 0;
+        }
+
+        .account-label {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .account-value {
+            color: var(--text-primary);
+            font-weight: 700;
+            text-align: right;
+            max-width: 65%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* ============================================
+           🚫 ESTADO VAZIO
+           ============================================ */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .empty-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 16px;
+            border-radius: 24px;
+            background: var(--bg-base);
+            border: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: var(--text-muted);
+        }
+
+        .empty-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .empty-text {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* ============================================
+           ⏳ LOADING
+           ============================================ */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 10, 15, 0.9);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .loading-spinner {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            border: 3px solid var(--border-subtle);
+            border-top-color: var(--color-primary);
+            animation: spin 0.8s linear infinite;
+        }
+
+        .loading-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        /* ============================================
+           🔔 TOAST
+           ============================================ */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            left: 16px;
+            right: 16px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            color: var(--text-primary);
+            font-size: 13.5px;
+            font-weight: 600;
+            animation: toastSlide 0.4s var(--transition-slow);
+            pointer-events: auto;
+        }
+
+        @keyframes toastSlide {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .toast.removing {
+            animation: toastOut 0.3s ease forwards;
+        }
+
+        @keyframes toastOut {
+            to { opacity: 0; transform: translateY(-20px); }
+        }
+
+        .toast-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+
+        .toast.success .toast-icon {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--color-success);
+        }
+        .toast.error .toast-icon {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--color-danger);
+        }
+        .toast.info .toast-icon {
+            background: rgba(124, 92, 255, 0.15);
+            color: var(--color-primary-light);
+        }
+
+        /* ============================================
+           🔒 ESTADO VAZIO
+           ============================================ */
+        .hidden { display: none !important; }
+
+        /* ============================================
+           📱 RESPONSIVO
+           ============================================ */
+        @media (max-width: 400px) {
+            body { padding: 16px; }
+            .page-title { font-size: 20px; }
+            .card { padding: 16px; border-radius: 20px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ============================================
+     🔔 TOASTS
+     ============================================ -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ============================================
+     ⏳ LOADING
+     ============================================ -->
+<div class="loading-overlay" id="loading-overlay" style="display: none;">
+    <div class="loading-spinner"></div>
+    <div class="loading-text" id="loading-text">Carregando...</div>
+</div>
+
+<!-- ============================================
+     🎯 CONTEÚDO
+     ============================================ -->
+<div class="container">
+
+    <!-- Header -->
+    <div class="page-header">
+        <div class="page-icon">🏦</div>
+        <div class="page-title-group">
+            <div class="page-title">Conta Bancária</div>
+            <div class="page-subtitle">Pra receber seus saques</div>
+        </div>
+    </div>
+
+    <!-- ═══ ESTADO: CONTA JÁ CADASTRADA ═══ -->
+    <div id="state-has-account" class="hidden">
+        <div class="card">
+            <div class="card-title">
+                <i class="fa-solid fa-circle-check"></i>
+                Conta Cadastrada
+            </div>
+            <div class="card-desc">
+                Você já tem uma conta bancária salva para receber seus saques.
+            </div>
+
+            <div class="account-card">
+                <div class="account-badge">
+                    <i class="fa-solid fa-check-circle"></i>
+                    Conta padrão
+                </div>
+
+                <div class="account-row">
+                    <span class="account-label">Banco</span>
+                    <span class="account-value" id="info-bank">—</span>
+                </div>
+                <div class="account-row">
+                    <span class="account-label">Agência</span>
+                    <span class="account-value" id="info-agency">—</span>
+                </div>
+                <div class="account-row">
+                    <span class="account-label">Conta</span>
+                    <span class="account-value" id="info-account">—</span>
+                </div>
+                <div class="account-row">
+                    <span class="account-label">Tipo</span>
+                    <span class="account-value" id="info-type">—</span>
+                </div>
+                <div class="account-row">
+                    <span class="account-label">Titular</span>
+                    <span class="account-value" id="info-holder">—</span>
+                </div>
+            </div>
+
+            <button class="btn btn-primary" id="btn-edit">
+                <i class="fa-solid fa-pen"></i>
+                <span>Alterar Dados</span>
+            </button>
+
+            <button class="btn btn-danger" id="btn-delete">
+                <i class="fa-solid fa-trash-can"></i>
+                <span>Remover Conta</span>
+            </button>
+        </div>
+
+        <div class="card">
+            <div class="card-title">
+                <i class="fa-solid fa-circle-info"></i>
+                Como funciona
+            </div>
+            <div class="card-desc" style="margin-bottom: 0;">
+                Quando você solicitar um saque por banco, o valor será
+                transferido para essa conta em até <strong>3 dias úteis</strong>.
+                Confira bem os dados antes de salvar.
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ ESTADO: CADASTRAR/EDITAR CONTA ═══ -->
+    <div id="state-form" class="hidden">
+        <form id="bank-form" autocomplete="off">
+            <!-- Seleção de banco -->
+            <div class="card">
+                <div class="card-title">
+                    <i class="fa-solid fa-building-columns"></i>
+                    Escolha o banco
+                </div>
+                <div class="card-desc">
+                    Selecione seu banco na lista abaixo.
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="bank-code">
+                        Banco <span class="required">*</span>
+                    </label>
+                    <div class="select-wrapper">
+                        <select class="form-select" id="bank-code" required>
+                            <option value="">Carregando bancos...</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dados da conta -->
+            <div class="card">
+                <div class="card-title">
+                    <i class="fa-solid fa-key"></i>
+                    Dados da conta
+                </div>
+                <div class="card-desc">
+                    Preencha os dados exatamente como aparecem no seu banco.
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="agency">
+                            Agência <span class="required">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            class="form-input"
+                            id="agency"
+                            placeholder="0001"
+                            inputmode="numeric"
+                            maxlength="10"
+                            required
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="account">
+                            Conta <span class="required">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            class="form-input"
+                            id="account"
+                            placeholder="12345-6"
+                            inputmode="numeric"
+                            maxlength="20"
+                            required
+                        >
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="account-type">
+                        Tipo de conta <span class="required">*</span>
+                    </label>
+                    <div class="select-wrapper">
+                        <select class="form-select" id="account-type" required>
+                            <option value="corrente">Conta Corrente</option>
+                            <option value="poupanca">Conta Poupança</option>
+                            <option value="salario">Conta Salário</option>
+                            <option value="pagamento">Conta de Pagamento</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Titular -->
+            <div class="card">
+                <div class="card-title">
+                    <i class="fa-solid fa-user"></i>
+                    Titular da conta
+                </div>
+                <div class="card-desc">
+                    O titular precisa ser <strong>você mesmo</strong>.
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="holder-name">
+                        Nome completo <span class="required">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        class="form-input"
+                        id="holder-name"
+                        placeholder="João da Silva"
+                        maxlength="100"
+                        required
+                    >
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label" for="holder-document">
+                        CPF/CNPJ <span class="required">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        class="form-input"
+                        id="holder-document"
+                        placeholder="000.000.000-00"
+                        inputmode="numeric"
+                        maxlength="20"
+                        required
+                    >
+                </div>
+            </div>
+
+            <!-- Botões -->
+            <button type="submit" class="btn btn-primary" id="btn-save">
+                <i class="fa-solid fa-floppy-disk"></i>
+                <span id="btn-save-text">Salvar Conta</span>
+            </button>
+
+            <button type="button" class="btn btn-ghost" id="btn-cancel">
+                <i class="fa-solid fa-xmark"></i>
+                <span>Cancelar</span>
+            </button>
+        </form>
+    </div>
+
+    <!-- ═══ ESTADO: SEM ACESSO ═══ -->
+    <div id="state-no-access" class="hidden">
+        <div class="card">
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <div class="empty-title">Acesso negado</div>
+                <div class="empty-text">
+                    Abra esta página pelo <strong>Telegram WebApp</strong> para acessar.
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ============================================
+     🚀 SCRIPT
+     ============================================ -->
+<script>
+(function() {
+    'use strict';
+
+    // ============================================
+    // 🌐 ESTADO GLOBAL
+    // ============================================
+    const State = {
+        tg: null,
+        initData: '',
+        user: null,
+        config: null,
+        currentAccount: null,
+        banks: [],
+        editMode: false,
+    };
+
+    const API_BASE = '/api/webapp';
+
+    // ============================================
+    // 🏦 LISTA DE BANCOS (padrão)
+    // ============================================
+    const DEFAULT_BANKS = [
+        { code: '001', name: 'Banco do Brasil' },
+        { code: '033', name: 'Santander' },
+        { code: '104', name: 'Caixa Econômica Federal' },
+        { code: '237', name: 'Bradesco' },
+        { code: '341', name: 'Itaú Unibanco' },
+        { code: '260', name: 'Nubank' },
+        { code: '077', name: 'Banco Inter' },
+        { code: '290', name: 'PagBank' },
+        { code: '380', name: 'PicPay' },
+        { code: '336', name: 'Banco C6' },
+        { code: '655', name: 'Votorantim' },
+        { code: '422', name: 'Banco Safra' },
+        { code: '212', name: 'Banco Original' },
+        { code: '389', name: 'Banco Mercantil' },
+        { code: '399', name: 'HSBC' },
+        { code: '745', name: 'Citibank' },
+        { code: '748', name: 'Sicredi' },
+        { code: '756', name: 'Sicoob' },
+        { code: '041', name: 'Banrisul' },
+        { code: '004', name: 'Banco do Nordeste' },
+        { code: '021', name: 'Banestes' },
+        { code: '084', name: 'Uniprime' },
+        { code: '085', name: 'Cecred' },
+        { code: '097', name: 'Credisis' },
+        { code: '136', name: 'Unicred' },
+        { code: '197', name: 'Stone' },
+        { code: '208', name: 'BTG Pactual' },
+        { code: '246', name: 'Banco ABC Brasil' },
+        { code: '323', name: 'Mercado Pago' },
+        { code: '364', name: 'Gerencianet' },
+        { code: '461', name: 'Asaas' },
+        { code: '505', name: 'Credit Suisse' },
+        { code: '637', name: 'Banco Sofisa' },
+        { code: '707', name: 'Banco Daycoval' },
+        { code: '735', name: 'Neon' },
+        { code: '741', name: 'Ribeirão Preto' },
+    ];
+
+    // ============================================
+    // 🧰 HELPERS
+    // ============================================
+    function $(id) { return document.getElementById(id); }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = String(str);
+        return div.innerHTML;
+    }
+
+    function haptic(type) {
+        try {
+            if (State.tg && State.tg.HapticFeedback) {
+                if (type === 'success') State.tg.HapticFeedback.notificationOccurred('success');
+                else if (type === 'error') State.tg.HapticFeedback.notificationOccurred('error');
+                else if (type === 'warning') State.tg.HapticFeedback.notificationOccurred('warning');
+                else State.tg.HapticFeedback.impactOccurred('light');
+            }
+        } catch(e) {}
+    }
+
+    // ============================================
+    // 🔔 TOAST
+    // ============================================
+    function toast(message, type, duration) {
+        type = type || 'info';
+        duration = duration || 3200;
+
+        const container = $('toast-container');
+        if (!container) return;
+
+        const icons = {
+            success: 'fa-check',
+            error: 'fa-xmark',
+            warning: 'fa-triangle-exclamation',
+            info: 'fa-circle-info',
+        };
+
+        const el = document.createElement('div');
+        el.className = `toast ${type}`;
+        el.innerHTML = `
+            <div class="toast-icon">
+                <i class="fa-solid ${icons[type] || icons.info}"></i>
+            </div>
+            <div>${escapeHtml(message)}</div>
+        `;
+
+        container.appendChild(el);
+
+        setTimeout(() => {
+            el.classList.add('removing');
+            setTimeout(() => el.remove(), 350);
+        }, duration);
+    }
+
+    // ============================================
+    // ⏳ LOADING
+    // ============================================
+    function showLoading(text) {
+        $('loading-text').textContent = text || 'Carregando...';
+        $('loading-overlay').style.display = 'flex';
+    }
+
+    function hideLoading() {
+        $('loading-overlay').style.display = 'none';
+    }
+
+    // ============================================
+    // 📡 API
+    // ============================================
+    async function api(path, options) {
+        options = options || {};
+        const url = `${API_BASE}${path}`;
+        const headers = {
+            'Content-Type': 'application/json',
+            'X-Telegram-Init-Data': State.initData,
+            ...(options.headers || {}),
+        };
+
+        const res = await fetch(url, { ...options, headers });
+
+        let data = null;
+        try { data = await res.json(); } catch(e) {}
+
+        if (!res.ok) {
+            const err = new Error(
+                (data && data.detail && (data.detail.error || data.detail)) ||
+                `HTTP ${res.status}`
+            );
+            err.status = res.status;
+            err.data = data;
+            throw err;
+        }
+
+        return data;
+    }
+
+    // ============================================
+    // 🎨 APLICAR CONFIG
+    // ============================================
+    function applyConfig(config) {
+        State.config = config;
+        const root = document.documentElement;
+
+        if (config.colors) {
+            const c = config.colors;
+            if (c.primary) root.style.setProperty('--color-primary', c.primary);
+            if (c.accent) root.style.setProperty('--color-accent', c.accent);
+            if (c.success) root.style.setProperty('--color-success', c.success);
+            if (c.warning) root.style.setProperty('--color-warning', c.warning);
+            if (c.danger) root.style.setProperty('--color-danger', c.danger);
+        }
+
+        if (config.site_title || config.bot_name) {
+            const title = config.site_title || config.bot_name;
+            document.title = `Conta Bancária · ${title}`;
+        }
+    }
+
+    // ============================================
+    // 🎯 TROCA DE ESTADO
+    // ============================================
+    function showState(name) {
+        ['has-account', 'form', 'no-access'].forEach((s) => {
+            const el = $(`state-${s}`);
+            if (!el) return;
+            if (s === name) el.classList.remove('hidden');
+            else el.classList.add('hidden');
+        });
+
+        // Re-scroll pro topo
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ============================================
+    // 🏦 POPULAR SELECT DE BANCOS
+    // ============================================
+    function populateBanks() {
+        const select = $('bank-code');
+        if (!select) return;
+
+        select.innerHTML = '<option value="">Selecione...</option>';
+
+        State.banks.forEach((bank) => {
+            const opt = document.createElement('option');
+            opt.value = bank.code;
+            opt.textContent = `${bank.code} — ${bank.name}`;
+            select.appendChild(opt);
+        });
+    }
+
+    // ============================================
+    // 📊 MOSTRAR CONTA EXISTENTE
+    // ============================================
+    function showExistingAccount(account) {
+        State.currentAccount = account;
+
+        const bankName = account.bank_name ||
+            (State.banks.find(b => b.code === account.bank_code)?.name) ||
+            account.bank_code || '—';
+
+        $('info-bank').textContent = `${account.bank_code || ''} — ${bankName}`;
+        $('info-agency').textContent = account.agency || '—';
+        $('info-account').textContent = account.account || '—';
+        $('info-type').textContent = ({
+            corrente: 'Conta Corrente',
+            poupanca: 'Conta Poupança',
+            salario: 'Conta Salário',
+            pagamento: 'Conta de Pagamento',
+        })[account.account_type] || account.account_type || '—';
+        $('info-holder').textContent = account.holder_name || '—';
+
+        showState('has-account');
+    }
+
+    // ============================================
+    // 📝 PREPARAR FORMULÁRIO
+    // ============================================
+    function prepareForm(prefill) {
+        prefill = prefill || null;
+
+        if (prefill) {
+            $('bank-code').value = prefill.bank_code || '';
+            $('agency').value = prefill.agency || '';
+            $('account').value = prefill.account || '';
+            $('account-type').value = prefill.account_type || 'corrente';
+            $('holder-name').value = prefill.holder_name || '';
+            $('holder-document').value = prefill.holder_document || '';
+            $('btn-save-text').textContent = 'Atualizar Conta';
+            State.editMode = true;
+        } else {
+            $('bank-form').reset();
+            $('btn-save-text').textContent = 'Salvar Conta';
+            State.editMode = false;
+        }
+
+        showState('form');
+    }
+
+    // ============================================
+    // 📥 CARREGAR CONTA DO USUÁRIO
+    // ============================================
+    async function loadAccount() {
+        try {
+            const data = await api('/bank/me', { method: 'GET' });
+
+            if (data && data.account) {
+                showExistingAccount(data.account);
+            } else {
+                // Sem conta — mostra formulário
+                prepareForm(null);
+            }
+        } catch (e) {
+            console.error('Erro ao carregar conta:', e);
+            // Erro silencioso — mostra formulário
+            prepareForm(null);
+        }
+    }
+
+    // ============================================
+    // 💾 SALVAR CONTA
+    // ============================================
+    async function saveAccount(e) {
+        e.preventDefault();
+
+        const btn = $('btn-save');
+        const originalText = $('btn-save-text').textContent;
+
+        // Validação
+        const bankCode = $('bank-code').value;
+        const agency = $('agency').value.trim();
+        const account = $('account').value.trim();
+        const accountType = $('account-type').value;
+        const holderName = $('holder-name').value.trim();
+        const holderDocument = $('holder-document').value.trim();
+
+        if (!bankCode) {
+            toast('Selecione um banco', 'error');
+            $('bank-code').classList.add('invalid');
+            haptic('error');
+            return;
+        }
+
+        if (!agency || agency.length < 2) {
+            toast('Agência inválida', 'error');
+            $('agency').classList.add('invalid');
+            haptic('error');
+            return;
+        }
+
+        if (!account || account.length < 4) {
+            toast('Número da conta inválido', 'error');
+            $('account').classList.add('invalid');
+            haptic('error');
+            return;
+        }
+
+        if (!holderName || holderName.length < 3) {
+            toast('Nome do titular inválido', 'error');
+            $('holder-name').classList.add('invalid');
+            haptic('error');
+            return;
+        }
+
+        const documentDigits = holderDocument.replace(/\D/g, '');
+        if (documentDigits.length !== 11 && documentDigits.length !== 14) {
+            toast('CPF (11) ou CNPJ (14) inválido', 'error');
+            $('holder-document').classList.add('invalid');
+            haptic('error');
+            return;
+        }
+
+        // Limpa estados inválidos
+        ['bank-code', 'agency', 'account', 'holder-name', 'holder-document'].forEach((id) => {
+            $(id).classList.remove('invalid');
+        });
+
+        // Loading
+        btn.disabled = true;
+        $('btn-save-text').innerHTML = '<div class="spinner" style="display:inline-block;"></div>';
+
+        try {
+            const payload = {
+                bank_code: bankCode,
+                bank_name: State.banks.find(b => b.code === bankCode)?.name || '',
+                agency: agency,
+                account: account,
+                account_type: accountType,
+                holder_name: holderName,
+                holder_document: holderDocument,
+            };
+
+            const data = await api('/bank/save', {
+                method: 'POST',
+                body: JSON.stringify(payload),
+            });
+
+            if (data.success) {
+                haptic('success');
+                toast('Conta salva com sucesso!', 'success');
+
+                // Mostra a conta salva
+                setTimeout(() => {
+                    if (data.account) {
+                        showExistingAccount(data.account);
+                    } else {
+                        loadAccount();
+                    }
+                }, 500);
+            } else {
+                throw new Error(data.error || 'Erro ao salvar');
+            }
+
+        } catch (e) {
+            console.error('Erro ao salvar:', e);
+            haptic('error');
+
+            const errorMsg = (e.data && e.data.detail) || e.message || 'Erro ao salvar';
+            toast(errorMsg, 'error', 5000);
+
+            btn.disabled = false;
+            $('btn-save-text').textContent = originalText;
+        }
+    }
+
+    // ============================================
+    // 🗑 REMOVER CONTA
+    // ============================================
+    async function deleteAccount() {
+        if (!confirm('Tem certeza que deseja remover esta conta bancária?\n\nVocê precisará cadastrar novamente para solicitar saques por banco.')) {
+            return;
+        }
+
+        const btn = $('btn-delete');
+        const originalHtml = btn.innerHTML;
+
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner" style="display:inline-block;"></div>';
+
+        try {
+            const data = await api('/bank/delete', { method: 'POST' });
+
+            if (data.success) {
+                haptic('success');
+                toast('Conta removida', 'success');
+                State.currentAccount = null;
+                State.editMode = false;
+
+                setTimeout(() => {
+                    prepareForm(null);
+                }, 500);
+            } else {
+                throw new Error(data.error || 'Erro ao remover');
+            }
+
+        } catch (e) {
+            console.error('Erro ao remover:', e);
+            haptic('error');
+            toast(e.message || 'Erro ao remover', 'error');
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
+
+    // ============================================
+    // 📱 MÁSCARAS
+    // ============================================
+    function applyMasks() {
+        // CPF/CNPJ
+        const docInput = $('holder-document');
+        if (docInput) {
+            docInput.addEventListener('input', (e) => {
+                let value = e.target.value.replace(/\D/g, '');
+                if (value.length <= 11) {
+                    // CPF: 000.000.000-00
+                    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+                    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+                    value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+                } else {
+                    // CNPJ: 00.000.000/0000-00
+                    value = value.replace(/^(\d{2})(\d)/, '$1.$2');
+                    value = value.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+                    value = value.replace(/\.(\d{3})(\d)/, '.$1/$2');
+                    value = value.replace(/(\d{4})(\d)/, '$1-$2');
+                }
+                e.target.value = value;
+            });
+        }
+
+        // Agência/Conta (só números)
+        ['agency', 'account'].forEach((id) => {
+            const input = $(id);
+            if (input) {
+                input.addEventListener('input', (e) => {
+                    e.target.value = e.target.value.replace(/[^\d\-]/g, '');
+                });
+            }
+        });
+    }
+
+    // ============================================
+    // 🎯 EVENTOS
+    // ============================================
+    function attachEvents() {
+        // Form submit
+        const form = $('bank-form');
+        if (form) form.addEventListener('submit', saveAccount);
+
+        // Editar
+        const btnEdit = $('btn-edit');
+        if (btnEdit) {
+            btnEdit.addEventListener('click', () => {
+                haptic('light');
+                prepareForm(State.currentAccount);
+            });
+        }
+
+        // Remover
+        const btnDelete = $('btn-delete');
+        if (btnDelete) btnDelete.addEventListener('click', deleteAccount);
+
+        // Cancelar
+        const btnCancel = $('btn-cancel');
+        if (btnCancel) {
+            btnCancel.addEventListener('click', () => {
+                haptic('light');
+                if (State.currentAccount) {
+                    showExistingAccount(State.currentAccount);
+                } else {
+                    // Se não tem conta, tenta fechar a WebApp
+                    if (State.tg && State.tg.close) {
+                        State.tg.close();
+                    } else {
+                        window.history.back();
+                    }
+                }
+            });
+        }
+    }
+
+    // ============================================
+    // 🚀 INICIALIZAÇÃO
+    // ============================================
+    async function init() {
+        // Telegram SDK
+        State.tg = window.Telegram && window.Telegram.WebApp;
+
+        if (State.tg) {
+            try {
+                State.tg.ready();
+                State.tg.expand();
+                if (State.tg.setHeaderColor) State.tg.setHeaderColor('#0a0a0f');
+                if (State.tg.setBackgroundColor) State.tg.setBackgroundColor('#0a0a0f');
+                State.initData = State.tg.initData || '';
+            } catch (e) {
+                console.warn('Erro Telegram SDK:', e);
+            }
+        }
+
+        // Sem initData → sem acesso
+        if (!State.initData) {
+            showState('no-access');
+            return;
+        }
+
+        // Carrega config
+        try {
+            const config = await api('/config', { method: 'GET' });
+            applyConfig(config);
+        } catch (e) {
+            console.warn('Erro config:', e);
+        }
+
+        // Carrega lista de bancos (ou usa padrão)
+        try {
+            const data = await api('/bank/list', { method: 'GET' });
+            if (data && data.banks && data.banks.length > 0) {
+                State.banks = data.banks;
+            } else {
+                State.banks = DEFAULT_BANKS;
+            }
+        } catch (e) {
+            State.banks = DEFAULT_BANKS;
+        }
+
+        populateBanks();
+        applyMasks();
+        attachEvents();
+
+        // Carrega conta do usuário
+        await loadAccount();
+    }
+
+    // ============================================
+    // 🎬 BOOT
+    // ============================================
+    document.addEventListener('DOMContentLoaded', init);
+
+})();
+</script>
+
+</body>
+</html>

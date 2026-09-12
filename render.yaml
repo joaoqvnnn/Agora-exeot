@@ -1,0 +1,249 @@
+# ============================================
+# 🚀 RENDER.YAML — Larizinha Store (Python)
+# ============================================
+# Deploy do bot + API no Render.
+#
+# Este arquivo configura:
+#   - Web Service (FastAPI + Bot Telegram)
+#   - PostgreSQL (opcional — se não usar Neon)
+#   - Variáveis de ambiente
+#   - Build e Start commands
+#
+# ⚠️ RECOMENDADO:
+#   - Use Neon.tech pro banco (grátis pra sempre)
+#   - Use plano "starter" pra produção
+#   - Plano "free" dorme em 15min (ok pra teste)
+# ============================================
+
+services:
+  # ============================================
+  # 🤖 WEB SERVICE (bot + API)
+  # ============================================
+  - type: web
+    name: larizinha-store
+    runtime: python
+    plan: free                    # ⚠️ Troque pra "starter" em produção
+    region: oregon                # Opções: oregon, ohio, virginia, frankfurt, singapore
+    branch: main
+    autoDeploy: true
+    healthCheckPath: /health
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    startCommand: |
+      alembic upgrade head && \
+      uvicorn bot.main:app --host 0.0.0.0 --port $PORT --workers 1
+
+    # ─────────────────────────────────────────
+    # 🔐 VARIÁVEIS DE AMBIENTE
+    # ─────────────────────────────────────────
+    # ⚠️ IMPORTANTE:
+    #   - Valores marcados com `sync: false` são configurados
+    #     direto no painel do Render (não ficam no repositório)
+    #   - Nunca coloque tokens reais neste arquivo
+    # ─────────────────────────────────────────
+    envVars:
+      # ─── Python ───
+      - key: PYTHON_VERSION
+        value: 3.11.9
+
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+      - key: PYTHONDONTWRITEBYTECODE
+        value: "1"
+
+      # ─── Ambiente ───
+      - key: ENVIRONMENT
+        value: production
+
+      - key: LOG_LEVEL
+        value: INFO
+
+      - key: TIMEZONE
+        value: America/Sao_Paulo
+
+      # ─── 🗄️ Banco de dados (Neon.tech) ───
+      # Cole a connection string completa no painel do Render
+      - key: DATABASE_URL
+        sync: false
+
+      # ─── 🤖 Bot Telegram (cliente) ───
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+
+      - key: TELEGRAM_BOT_USERNAME
+        sync: false
+
+      - key: TELEGRAM_OWNER_ID
+        sync: false
+
+      - key: TELEGRAM_WEBHOOK_URL
+        sync: false
+
+      - key: TELEGRAM_WEBHOOK_SECRET
+        generateValue: true      # Gera uma string aleatória automaticamente
+
+      # ─── 🤖 Bot Telegram (admin) ───
+      - key: TELEGRAM_ADMIN_BOT_TOKEN
+        sync: false
+
+      - key: TELEGRAM_ADMIN_BOT_USERNAME
+        sync: false
+
+      - key: TELEGRAM_ADMIN_WEBHOOK_URL
+        sync: false
+
+      - key: TELEGRAM_ADMIN_WEBHOOK_SECRET
+        generateValue: true
+
+      # ─── 📢 Canal obrigatório ───
+      - key: TELEGRAM_REQUIRED_CHANNEL_ID
+        sync: false
+
+      - key: TELEGRAM_REQUIRED_CHANNEL_LINK
+        sync: false
+
+      # ─── 💳 Mercado Pago ───
+      - key: MERCADOPAGO_ACCESS_TOKEN
+        sync: false
+
+      - key: MERCADOPAGO_PUBLIC_KEY
+        sync: false
+
+      - key: MERCADOPAGO_WEBHOOK_SECRET
+        generateValue: true
+
+      - key: MERCADOPAGO_WEBHOOK_URL
+        sync: false
+
+      # ─── 📧 E-mail (SMTP) ───
+      - key: SMTP_HOST
+        sync: false
+
+      - key: SMTP_PORT
+        sync: false
+
+      - key: SMTP_USER
+        sync: false
+
+      - key: SMTP_PASSWORD
+        sync: false
+
+      - key: SMTP_FROM_NAME
+        sync: false
+
+      - key: SMTP_FROM_EMAIL
+        sync: false
+
+      - key: SMTP_USE_TLS
+        sync: false
+
+      # ─── 🤖 OpenAI ───
+      - key: OPENAI_API_KEY
+        sync: false
+
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+
+      - key: OPENAI_MAX_TOKENS
+        value: "500"
+
+      - key: OPENAI_TEMPERATURE
+        value: "0.7"
+
+      # ─── 📱 WhatsApp (Baileys service) ───
+      # URL do serviço Baileys no Render
+      # Ex: https://larizinha-whatsapp.onrender.com
+      - key: WHATSAPP_API_URL
+        sync: false
+
+      # API key que o Baileys espera (mesma configurada lá)
+      - key: WHATSAPP_API_KEY
+        sync: false
+
+      - key: WHATSAPP_PHONE_NUMBER
+        sync: false
+
+      # ─── 🔐 Segurança ───
+      - key: SECRET_KEY
+        generateValue: true      # Gera automaticamente (min 32 chars)
+
+      - key: JWT_ALGORITHM
+        value: HS256
+
+      - key: JWT_EXPIRE_MINUTES
+        value: "1440"
+
+      # ─── 🛡️ Anti-flood ───
+      - key: ANTIFLOOD_MAX_MESSAGES
+        value: "20"
+
+      - key: ANTIFLOOD_WINDOW_SECONDS
+        value: "10"
+
+      - key: ANTIFLOOD_BLOCK_SECONDS
+        value: "600"
+
+      # ─── 🌐 URLs do sistema ───
+      # ⚠️ Substitua pelo seu domínio do Render
+      - key: BASE_URL
+        sync: false
+
+      - key: WEBAPP_URL
+        sync: false
+
+      - key: ACTIVATION_URL
+        sync: false
+
+      # ─── 📊 Logs / Suporte ───
+      - key: LOGS_CHANNEL_ID
+        sync: false
+
+      - key: SUPPORT_LINK
+        sync: false
+
+
+# ============================================
+# 🗄️ POSTGRESQL (OPCIONAL)
+# ============================================
+# Se você usar Neon.tech (recomendado), deixe comentado.
+# Se quiser usar o Postgres do Render, descomente.
+#
+# ⚠️ ATENÇÃO:
+#   - Plano free do Postgres do Render dura só 90 dias
+#   - Neon.tech é grátis pra sempre
+# ============================================
+
+# databases:
+#   - name: larizinha-db
+#     databaseName: larizinha_store
+#     user: larizinha
+#     plan: free
+#     region: oregon
+#     postgresMajorVersion: 16
+
+
+# ============================================
+# 🔧 CONFIGURAÇÕES AVANÇADAS
+# ============================================
+
+# ─── Auto-scaling (só plano pago) ───
+# autoscaling:
+#   minInstances: 1
+#   maxInstances: 3
+#   targetCPUPercent: 70
+#   targetMemoryPercent: 80
+
+# ─── Disco persistente (só plano pago) ───
+# disk:
+#   name: larizinha-data
+#   mountPath: /data
+#   sizeGB: 1
+
+# ─── Notificações ───
+notifications:
+  - type: deploy_failed
+    enabled: true
+  - type: deploy_success
+    enabled: false     # Não queremos email a cada deploy

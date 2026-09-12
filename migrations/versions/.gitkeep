@@ -1,0 +1,3 @@
+# Esta pasta guarda os arquivos de migration gerados pelo Alembic.
+# O .gitkeep existe só pra forçar o Git a versionar a pasta vazia.
+# Não apague este arquivo.

@@ -10,7 +10,7 @@
 #   4. Sistema valida formato
 #   5. Sistema envia código de 6 dígitos
 #   6. Cliente digita o código
-#   7. Sistema valida (limite de tentativas + expiração)
+#   7. Sistema valida (persistente + limite de tentativas)
 #   8. Sistema envia OUTRO e-mail com LINK DE ACESSO
 #   9. Cliente clica no link → website
 #   10. Cliente digita a senha cadastrada
@@ -18,11 +18,17 @@
 #
 # O Telegram NUNCA recebe os dados do produto —
 # eles ficam apenas no website protegido por senha.
+#
+# ✨ ATUALIZADO:
+#   - Usa `email_verification` (persistente no banco)
+#   - Códigos sobrevivem a restart
+#   - Cooldown de 60s entre reenvios
+#   - Auditoria de cada ação
 # ============================================
 
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from decimal import Decimal
 
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
@@ -43,9 +49,11 @@ from core.models import (
     StockItem,
     StockStatus,
     User,
+    VerificationCodeType,
 )
 from core.services import config as config_service
 from core.services import email as email_service
+from core.services import email_verification
 from core.services import stock as stock_service
 
 
@@ -56,10 +64,6 @@ router = Router(name="delivery_email")
 # ⚙️ CONFIGURAÇÕES
 # ============================================
 EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[a-z]{2,}$", re.IGNORECASE)
-
-MAX_ATTEMPTS = 5                 # tentativas de código
-CODE_EXPIRATION_MINUTES = 15     # validade do código
-ACTIVATION_HOURS = 24            # validade da sessão de ativação
 
 
 # ============================================
@@ -112,6 +116,28 @@ def _cancel_keyboard(back_data: str = "buy:cancel:0:0") -> InlineKeyboardMarkup:
     )
 
 
+def _cancel_and_resend_keyboard(
+    back_data: str = "buy:cancel:0:0",
+) -> InlineKeyboardMarkup:
+    """Botões de cancelar + reenviar código."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(
+                text="🔄 Reenviar Código",
+                callback_data="buy:resend_email_code",
+            )],
+            [InlineKeyboardButton(
+                text="✏️ Trocar E-mail",
+                callback_data="buy:change_email",
+            )],
+            [InlineKeyboardButton(
+                text="❌ Cancelar",
+                callback_data=back_data,
+            )],
+        ]
+    )
+
+
 # ============================================
 # 📧 INICIAR FLUXO DE ENTREGA POR E-MAIL
 # ============================================
@@ -144,8 +170,6 @@ async def cb_start_email_delivery(
         delivery_order_id=order_id,
         delivery_email=None,
         delivery_attempts=0,
-        delivery_code=None,
-        delivery_code_expires=None,
     )
 
     text = (
@@ -204,39 +228,41 @@ async def msg_receive_email(
         await state.clear()
         return
 
-    # Gera código
-    code = email_service.generate_verification_code(6)
-    expires = datetime.now(timezone.utc) + timedelta(
-        minutes=CODE_EXPIRATION_MINUTES
-    )
+    # Salva o e-mail
+    await state.update_data(delivery_email=raw)
 
-    await state.update_data(
-        delivery_email=raw,
-        delivery_code=code,
-        delivery_code_expires=expires.isoformat(),
-        delivery_attempts=0,
-    )
-
-    # Envia código
-    result = await email_service.send_verification_code(
-        to_email=raw,
-        code=code,
-        purpose="Entrega de produto",
+    # Envia código (persistente no banco)
+    result = await email_verification.send_product_delivery_code(
+        session=session,
+        email=raw,
+        order_id=order_id,
+        telegram_id=user.telegram_id,
     )
 
     if not result.get("success"):
-        await message.answer(
-            f"❌ <b>Erro ao enviar o e-mail.</b>\n\n"
-            f"<code>{result.get('error', 'Erro desconhecido')}</code>\n\n"
-            f"Tente novamente ou use outro e-mail."
-        )
+        error = result.get("error", "Erro desconhecido")
+        cooldown = result.get("cooldown_seconds")
+
+        if cooldown:
+            await message.answer(
+                f"⏰ <b>Aguarde {cooldown}s</b> antes de solicitar outro código."
+            )
+        else:
+            await message.answer(
+                f"❌ <b>Erro ao enviar o e-mail.</b>\n\n"
+                f"<code>{error}</code>\n\n"
+                f"Tente novamente ou use outro e-mail."
+            )
         return
+
+    expiration = result.get("expiration_minutes", 15)
 
     await message.answer(
         f"📩 <b>Enviamos um código para seu e-mail.</b>\n\n"
         f"📧 E-mail: <b>{_mask_email(raw)}</b>\n\n"
         f"Digite o <b>código de 6 dígitos</b> que você recebeu:\n\n"
-        f"<i>O código expira em {CODE_EXPIRATION_MINUTES} minutos.</i>"
+        f"<i>O código expira em {expiration} minutos.</i>",
+        reply_markup=_cancel_and_resend_keyboard(),
     )
 
     await state.set_state(PurchaseStates.waiting_email_code)
@@ -271,52 +297,51 @@ async def msg_validate_code(
         return
 
     data = await state.get_data()
-    expected_code = data.get("delivery_code")
-    expires_str = data.get("delivery_code_expires")
-    attempts = data.get("delivery_attempts", 0)
     email = data.get("delivery_email")
     order_id = data.get("delivery_order_id")
 
-    if not expected_code or not order_id:
+    if not email or not order_id:
         await message.answer("❌ Sessão expirada. Use /start.")
         await state.clear()
         return
 
-    # Verifica expiração
-    try:
-        expires = datetime.fromisoformat(expires_str)
-        if datetime.now(timezone.utc) > expires:
+    # Valida (persistente no banco)
+    result = await email_verification.verify_product_delivery(
+        session=session,
+        email=email,
+        code=code_typed,
+    )
+
+    if not result.get("success"):
+        error = result.get("error", "Código incorreto")
+        attempts = result.get("attempts_remaining")
+        locked = result.get("locked")
+        expired = result.get("expired")
+
+        if locked:
             await message.answer(
-                "⏰ <b>Código expirado.</b>\n\n"
-                "Envie /start para começar de novo."
+                f"🚫 {error}\n\n"
+                f"Envie /start pra começar de novo."
             )
             await state.clear()
             return
-    except Exception:
-        pass
 
-    # Verifica limite de tentativas
-    if attempts >= MAX_ATTEMPTS:
-        await message.answer(
-            "🚫 <b>Muitas tentativas.</b>\n\n"
-            "Aguarde alguns minutos e tente novamente."
-        )
-        await state.clear()
+        if expired:
+            await message.answer(
+                f"⏰ {error}\n\n"
+                f"Envie /start pra começar de novo."
+            )
+            await state.clear()
+            return
+
+        extra = ""
+        if attempts is not None:
+            extra = f"\n\nTentativas restantes: <b>{attempts}</b>"
+
+        await message.answer(f"❌ {error}{extra}")
         return
 
-    # Verifica código
-    if code_typed != expected_code:
-        attempts += 1
-        await state.update_data(delivery_attempts=attempts)
-        remaining = MAX_ATTEMPTS - attempts
-
-        await message.answer(
-            f"❌ <b>Código incorreto.</b>\n\n"
-            f"Tentativas restantes: <b>{remaining}</b>"
-        )
-        return
-
-    # ✓ Código correto
+    # ✓ Código correto → entrega por e-mail
     await _deliver_by_email(
         message=message,
         state=state,
@@ -366,10 +391,11 @@ async def _deliver_by_email(
         await state.clear()
         return
 
-    # Salva o e-mail no usuário
-    user.email = email
-    user.email_verified = True
-    session.add(user)
+    # Salva o e-mail no usuário (se ainda não tiver)
+    if not user.email:
+        user.email = email
+        user.email_verified = True
+        session.add(user)
 
     await session.commit()
 
@@ -421,7 +447,7 @@ async def _deliver_by_email(
     except Exception as e:
         logger.debug(f"⚠️ Falha ao notificar: {e}")
 
-    # Libera reserva caso ainda esteja reservado (fallback)
+    # Marca como entregue
     try:
         await stock_service.mark_as_delivered(session, [i.id for i in items])
         await session.commit()
@@ -443,33 +469,33 @@ async def cb_resend_code(
 ) -> None:
     data = await state.get_data()
     email = data.get("delivery_email")
+    order_id = data.get("delivery_order_id")
 
-    if not email:
+    if not email or not order_id:
         await callback.answer("❌ Sessão expirada.", show_alert=True)
         return
 
-    # Gera novo código
-    code = email_service.generate_verification_code(6)
-    expires = datetime.now(timezone.utc) + timedelta(
-        minutes=CODE_EXPIRATION_MINUTES
+    # Reenvia (com cooldown)
+    result = await email_verification.send_product_delivery_code(
+        session=session,
+        email=email,
+        order_id=order_id,
+        telegram_id=user.telegram_id,
     )
 
-    await state.update_data(
-        delivery_code=code,
-        delivery_code_expires=expires.isoformat(),
-        delivery_attempts=0,
-    )
+    if not result.get("success"):
+        error = result.get("error", "Erro")
+        cooldown = result.get("cooldown_seconds")
 
-    result = await email_service.send_verification_code(
-        to_email=email,
-        code=code,
-        purpose="Entrega de produto",
-    )
+        if cooldown:
+            await callback.answer(
+                f"⏰ Aguarde {cooldown}s", show_alert=True
+            )
+        else:
+            await callback.answer(f"❌ {error}", show_alert=True)
+        return
 
-    if result.get("success"):
-        await callback.answer("📩 Novo código enviado!", show_alert=True)
-    else:
-        await callback.answer("❌ Erro ao reenviar.", show_alert=True)
+    await callback.answer("📩 Novo código enviado!", show_alert=True)
 
 
 # ============================================
@@ -488,8 +514,6 @@ async def cb_change_email(
 
     await state.update_data(
         delivery_email=None,
-        delivery_code=None,
-        delivery_code_expires=None,
         delivery_attempts=0,
     )
 
@@ -572,7 +596,7 @@ async def cb_delivery_telegram(
     user: User,
     session: AsyncSession,
 ) -> None:
-    """Entrega imediata no Telegram (fluxo já implementado em compra.py)."""
+    """Entrega imediata no Telegram."""
     parts = callback.data.split(":")
     try:
         order_id = int(parts[2])
@@ -592,7 +616,6 @@ async def cb_delivery_telegram(
 
     await callback.answer("📤 Entregando no Telegram...", show_alert=False)
 
-    # Usa o delivery service
     try:
         from core.services import delivery as delivery_service
         await delivery_service.deliver_order(
@@ -779,12 +802,12 @@ async def cb_confirm_whatsapp(
 
     await callback.answer("📤 Enviando para WhatsApp...", show_alert=False)
 
-    # Usa o delivery service
+    # Usa o wa_delivery service
     try:
-        from core.services import delivery as delivery_service
-        result = await delivery_service.deliver_order(
+        from core.services import wa_delivery
+
+        result = await wa_delivery.deliver_order_via_whatsapp(
             session=session,
-            bot=callback.bot,
             order_id=order_id,
         )
 
